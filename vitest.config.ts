@@ -3,6 +3,7 @@ import { configDefaults, defineConfig } from 'vitest/config';
 export default defineConfig({
   test: {
     environment: 'node',
+    globalSetup: 'test/global-setup.ts',
     exclude: [...configDefaults.exclude, 'test/e2e/**', 'dist/**'],
     coverage: {
       provider: 'v8',
