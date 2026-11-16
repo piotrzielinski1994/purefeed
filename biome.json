@@ -31,7 +31,30 @@
   "linter": {
     "enabled": true,
     "rules": {
-      "preset": "recommended"
+      "preset": "recommended",
+      "style": {
+        "noRestrictedGlobals": {
+          "level": "error",
+          "options": {
+            "deniedGlobals": {
+              "chrome": "Use ext from src/compat/browser.ts.",
+              "browser": "Use ext from src/compat/browser.ts."
+            }
+          }
+        }
+      }
     }
-  }
+  },
+  "overrides": [
+    {
+      "includes": ["src/compat/**"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedGlobals": "off"
+          }
+        }
+      }
+    }
+  ]
 }
