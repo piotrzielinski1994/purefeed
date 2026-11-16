@@ -57,4 +57,13 @@ export type Settings = {
 
 export type WhitelistEntry = { type: 'post' | 'source'; key: string };
 export type CounterValues = { duplicatesHidden: number; uniqueItems: number };
+
+export type StorageItems = Record<string, unknown>;
+export type KeyValueStorage = { get(keys: string): Promise<StorageItems>; set(items: StorageItems): Promise<void> };
+export type StorageChanges = Record<string, { oldValue?: unknown; newValue?: unknown }>;
+export type StorageChangedEvent = { addListener(listener: (changes: StorageChanges, areaName: string) => void): void };
+export type AlarmScheduler = {
+  create(name: string, info: { periodInMinutes: number }): Promise<void>;
+  onAlarm: { addListener(listener: (alarm: { name: string }) => void): void };
+};
 export type SetTimer = (fn: () => void, ms: number) => unknown;
