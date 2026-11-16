@@ -57,3 +57,4 @@ export type Settings = {
 
 export type WhitelistEntry = { type: 'post' | 'source'; key: string };
 export type CounterValues = { duplicatesHidden: number; uniqueItems: number };
+export type SetTimer = (fn: () => void, ms: number) => unknown;
