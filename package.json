@@ -1,0 +1,32 @@
+{
+  "name": "purefeed",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=26"
+  },
+  "scripts": {
+    "assets": "node scripts/generate-assets.ts",
+    "lint": "biome check .",
+    "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.worker.json",
+    "test": "vitest run --coverage",
+    "build": "node scripts/build.ts",
+    "lint:firefox": "web-ext lint --source-dir dist/firefox --self-hosted",
+    "test:e2e": "npm run build && playwright test",
+    "verify": "npm run lint && npm run typecheck && npm test && npm run build && npm run lint:firefox"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.6.8",
+    "@playwright/test": "1.62.1",
+    "@types/chrome": "0.3.7",
+    "@types/node": "26.6.6",
+    "@vitest/coverage-v8": "5.1.0",
+    "esbuild": "0.28.2",
+    "fake-indexeddb": "6.2.8",
+    "happy-dom": "21.0.4",
+    "typescript": "7.0.2",
+    "vitest": "5.1.0",
+    "web-ext": "10.8.0"
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "compilerOptions": {
+    "strict": true,
+    "target": "es2023",
+    "module": "preserve",
+    "moduleResolution": "bundler",
+    "noEmit": true,
+    "erasableSyntaxOnly": true,
+    "verbatimModuleSyntax": true,
+    "allowImportingTsExtensions": true,
+    "lib": ["es2023", "dom", "dom.iterable"],
+    "types": ["node", "chrome"],
+    "skipLibCheck": true
+  },
+  "include": ["src", "scripts", "test", "vitest.config.ts"],
+  "exclude": ["src/decoder/hash-worker.ts", "dist", "node_modules"]
+}

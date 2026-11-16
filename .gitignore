@@ -1,0 +1,6 @@
+dist/
+coverage/
+test/assets/generated/
+test-results/
+playwright-report/
+.cache/
