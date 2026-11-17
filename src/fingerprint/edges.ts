@@ -5,7 +5,9 @@ import { packBits } from './phash.ts';
 export const EDGE_GRID = 64;
 const SOBEL_SIZE = 256;
 const CELL = SOBEL_SIZE / EDGE_GRID;
-const EDGE_THRESHOLD = 100;
+const WINDOW = 6;
+const WINDOW_OFFSET = 1;
+const EDGE_THRESHOLD = 75;
 
 function sobelMagnitudes(img: GrayImage): Float64Array {
   const { data } = resizeArea(img, SOBEL_SIZE, SOBEL_SIZE);
@@ -20,13 +22,18 @@ function sobelMagnitudes(img: GrayImage): Float64Array {
   });
 }
 
+const WINDOW_SPANS = Array.from({ length: EDGE_GRID }, (_, cell) =>
+  Array.from({ length: WINDOW }, (_v, k) => cell * CELL - WINDOW_OFFSET + k).filter((p) => p >= 0 && p < SOBEL_SIZE),
+);
+
 export function edgeMap64(img: GrayImage): Uint32Array {
   const magnitudes = sobelMagnitudes(img);
-  const cellPixels = Array.from({ length: CELL * CELL }, (_, k) => Math.floor(k / CELL) * SOBEL_SIZE + (k % CELL));
   return packBits(
     Array.from({ length: EDGE_GRID * EDGE_GRID }, (_, i) => {
-      const origin = Math.floor(i / EDGE_GRID) * CELL * SOBEL_SIZE + (i % EDGE_GRID) * CELL;
-      return cellPixels.reduce((sum, offset) => sum + magnitudes[origin + offset], 0) / cellPixels.length > EDGE_THRESHOLD;
+      const xs = WINDOW_SPANS[i % EDGE_GRID];
+      const ys = WINDOW_SPANS[Math.floor(i / EDGE_GRID)];
+      const sum = ys.reduce((total, y) => xs.reduce((row, x) => row + magnitudes[y * SOBEL_SIZE + x], total), 0);
+      return sum / (xs.length * ys.length) > EDGE_THRESHOLD;
     }),
   );
 }

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { loadGray } from '../../test/helpers/assets.ts';
+import { cropGray } from '../../test/helpers/crop-sweep.ts';
 import type { GrayImage, ImageFingerprint } from '../shared/types.ts';
 import type { Alignment } from './image-similarity.ts';
 
@@ -69,6 +70,16 @@ describe('caption guard (AC-027, AC-028)', () => {
     const { bestImageSimilarity } = await loadSimilarity();
     const base = await fingerprintAsset('base.png');
     const cropped = await fingerprintAsset('crop-l10-tb5.png');
+    expect(guardRejects(base.edges, cropped.edges, bestImageSimilarity(base, cropped).alignment)).toBe(false);
+    expect(guardRejects(cropped.edges, base.edges, bestImageSimilarity(cropped, base).alignment)).toBe(false);
+  });
+
+  it('should not reject if base.png is compared with its copy cropped by a shape that is no crop variant', ASSET_TEST, async () => {
+    const { guardRejects } = await loadGuard();
+    const { bestImageSimilarity } = await loadSimilarity();
+    const original = loadGray('base.png');
+    const base = await fingerprint(original);
+    const cropped = await fingerprint(cropGray(original, { left: 18, right: 0, top: 36, bottom: 12 }));
     expect(guardRejects(base.edges, cropped.edges, bestImageSimilarity(base, cropped).alignment)).toBe(false);
     expect(guardRejects(cropped.edges, base.edges, bestImageSimilarity(cropped, base).alignment)).toBe(false);
   });

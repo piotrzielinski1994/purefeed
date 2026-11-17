@@ -50,6 +50,13 @@ describe('edge map (AC-027, AC-028)', () => {
     expect(many).toBeGreaterThan(4 * one);
   });
 
+  it('should set a full line of bits at any position of a weak edge relative to the 4-pixel cell grid', async () => {
+    const { edgeMap64 } = await loadEdges();
+    const weakStepAt = (edge: number) => image(256, 256, (x) => (x < edge ? 100 : 160));
+    const counts = [128, 129, 130, 131].map((edge) => bitCount(edgeMap64(weakStepAt(edge))));
+    expect(counts.every((n) => n >= 64)).toBe(true);
+  });
+
   it('should return equal maps if 2 copies of the same pixels are mapped', async () => {
     const { edgeMap64 } = await loadEdges();
     const make = () => image(300, 200, (x, y) => (x * 7 + y * 13) % 256);

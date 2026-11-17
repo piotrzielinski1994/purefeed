@@ -3,7 +3,8 @@ import type { SeenRecord } from './seen-record.ts';
 import type { SeenEntry, SeenStore } from './seen-store.ts';
 
 const DB_NAME = 'purefeed';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
+const FIRST_VERSION = 1;
 const STORE = 'seen';
 const LAST_SEEN_INDEX = 'lastSeenAt';
 
@@ -20,9 +21,28 @@ const completion = (tx: IDBTransaction): Promise<void> =>
     tx.onabort = () => reject(tx.error);
   });
 
+function deleteImageRecords(store: IDBObjectStore): void {
+  const cursorRequest = store.openCursor();
+  cursorRequest.onsuccess = () => {
+    const cursor = cursorRequest.result;
+    if (!cursor) {
+      return;
+    }
+    if ((cursor.value as SeenRecord).fingerprint.kind === 'image') {
+      cursor.delete();
+    }
+    cursor.continue();
+  };
+}
+
 function openDatabase(factory: IDBFactory): Promise<IDBDatabase> {
   const request = factory.open(DB_NAME, DB_VERSION);
-  request.onupgradeneeded = () => {
+  request.onupgradeneeded = (event) => {
+    const upgrade = request.transaction;
+    if (event.oldVersion >= FIRST_VERSION && upgrade) {
+      deleteImageRecords(upgrade.objectStore(STORE));
+      return;
+    }
     request.result.createObjectStore(STORE).createIndex(LAST_SEEN_INDEX, LAST_SEEN_INDEX);
   };
   return requestResult(request);

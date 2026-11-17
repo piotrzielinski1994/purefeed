@@ -59,7 +59,7 @@ describe('IndexedDB seen store (AC-035, AC-036, AC-040)', () => {
     expect(value).toEqual(RECORD);
   });
 
-  it('should create database purefeed v1 with out-of-line keyed store seen and index lastSeenAt if opened', async () => {
+  it('should create database purefeed v2 with out-of-line keyed store seen and index lastSeenAt if opened', async () => {
     const { openIdbSeenStore } = await loadIdb();
     const factory = new IDBFactory();
     await openIdbSeenStore(factory);
@@ -68,7 +68,7 @@ describe('IndexedDB seen store (AC-035, AC-036, AC-040)', () => {
     const store = tx.objectStore('seen');
     const facts = { version: db.version, keyPath: store.keyPath, hasLastSeenIndex: store.indexNames.contains('lastSeenAt') };
     db.close();
-    expect(facts).toEqual({ version: 1, keyPath: null, hasLastSeenIndex: true });
+    expect(facts).toEqual({ version: 2, keyPath: null, hasLastSeenIndex: true });
   });
 
   it('should load the written records of every fingerprint kind if the database is opened again in a new browser session', async () => {
@@ -108,10 +108,29 @@ describe('IndexedDB seen store (AC-035, AC-036, AC-040)', () => {
     expect((await store.loadAll()).map(([id]) => id)).toEqual(['kept']);
   });
 
+  it('should drop only the image records if a database written by the previous edge map version is opened', async () => {
+    const { openIdbSeenStore } = await loadIdb();
+    const factory = new IDBFactory();
+    const legacy = await new Promise<IDBDatabase>((resolve, reject) => {
+      const request = factory.open('purefeed', 1);
+      request.onupgradeneeded = () => {
+        const store = request.result.createObjectStore('seen');
+        store.createIndex('lastSeenAt', 'lastSeenAt');
+        store.put(RECORD, 'old-image');
+        store.put({ ...RECORD, fingerprint: posterFp(H2), contentType: 'video' }, 'old-poster');
+      };
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    legacy.close();
+    const store = await openIdbSeenStore(factory);
+    expect((await store.loadAll()).map(([id]) => id)).toEqual(['old-poster']);
+  });
+
   it('should reject if the database cannot be opened', async () => {
     const { openIdbSeenStore } = await loadIdb();
     const factory = new IDBFactory();
-    const newer = await openRaw(factory, 2);
+    const newer = await openRaw(factory, 3);
     newer.close();
     await expect(openIdbSeenStore(factory)).rejects.toBeDefined();
   });
