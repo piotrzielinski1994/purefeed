@@ -109,6 +109,7 @@ A hidden post stays in the page; a bar takes its place:
 - Retention purge runs at each background start and on a 24 h alarm; each background restart creates the alarm again, so its 24 h period starts over.
 - Firefox has no automated end-to-end tests (Playwright cannot load Firefox extensions); Firefox is covered by unit tests, `npm run lint:firefox` and the manual smoke steps M2, M3 and M5.
 - Automated E2E (end-to-end) tests run in Playwright Chromium 151; the minimum versions Chrome 120 and Firefox 128 are not tested.
+- The hide indicator shows the full status text and the full button labels from an indicator width of 356 px (measured in Playwright Chromium with a 15-character author handle); below 356 px the 2 "Always show" buttons show only "this post" and the author name, and their accessible names keep the full labels. A long author name ends in an ellipsis when it does not fit; the button tooltip shows the full name.
 - No store publication: the extension is not on the Chrome Web Store or AMO.
 
 ## Development

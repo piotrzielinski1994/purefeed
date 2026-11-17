@@ -30,7 +30,7 @@ export function createIndicator(doc: Document, data: IndicatorData, actions: Ind
     const el = element('button', className);
     el.type = 'button';
     el.setAttribute('aria-label', prefix === '' ? label : `${prefix} ${label}`);
-    el.append(...(prefix === '' ? [label] : [element('span', 'prefix', prefix), ` ${label}`]));
+    el.append(...(prefix === '' ? [label] : [element('span', 'prefix', prefix), ' ', element('span', 'name', label)]));
     el.addEventListener('click', onClick);
     return el;
   };
@@ -45,7 +45,9 @@ export function createIndicator(doc: Document, data: IndicatorData, actions: Ind
   const actionsRow = element('div', 'actions');
   actionsRow.append(button('action', '', 'Show', actions.onShow), button('action', ALWAYS_SHOW, 'this post', actions.onAlwaysShowPost));
   if (data.authorLabel !== null) {
-    actionsRow.append(button('action author', ALWAYS_SHOW, data.authorLabel, actions.onAlwaysShowAuthor));
+    const author = button('action author', ALWAYS_SHOW, data.authorLabel, actions.onAlwaysShowAuthor);
+    author.title = `${ALWAYS_SHOW} ${data.authorLabel}`;
+    actionsRow.append(author);
   }
   const bar = element('div', 'bar');
   bar.append(text, actionsRow);

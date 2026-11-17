@@ -497,7 +497,13 @@ test.describe('cross-platform flows on local Wykop, Reddit and X feeds (AC-029, 
 });
 
 type Box = { left: number; top: number; right: number; bottom: number };
-type IndicatorLayout = { bar: Box; textLines: number; buttons: Array<{ name: string; box: Box }> };
+type IndicatorLayout = {
+  bar: Box;
+  actions: Box;
+  barClipped: boolean;
+  text: { visible: string; lines: number; cut: string[] };
+  buttons: Array<{ visible: string; label: string | null; title: string | null; box: Box; cut: string[] }>;
+};
 
 async function indicatorLayout(page: Page, barBackendNodeId: number): Promise<IndicatorLayout> {
   const cdp = await page.context().newCDPSession(page);
@@ -508,12 +514,32 @@ async function indicatorLayout(page: Page, barBackendNodeId: number): Promise<In
       returnByValue: true,
       functionDeclaration: `function () {
         const box = (el) => { const r = el.getBoundingClientRect(); return { left: r.left, top: r.top, right: r.right, bottom: r.bottom }; };
+        const norm = (s) => s.replace(/\\s+/g, ' ').trim();
+        const cut = (el) => [el, ...el.querySelectorAll('*')]
+          .filter((n) => n.getClientRects().length > 0 && n.scrollWidth > n.clientWidth)
+          .map((n) => n.className || n.tagName);
         const text = this.querySelector('.text');
-        const lineHeight = parseFloat(getComputedStyle(text).lineHeight);
+        const range = document.createRange();
+        const walker = document.createTreeWalker(text, NodeFilter.SHOW_TEXT);
+        const tops = [];
+        for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+          range.selectNodeContents(node);
+          for (const r of range.getClientRects()) if (r.width > 0) tops.push(r.top);
+        }
+        const half = parseFloat(getComputedStyle(text).lineHeight) / 2;
+        const lines = tops.sort((a, b) => a - b).filter((t, i, all) => i === 0 || t - all[i - 1] > half).length;
         return {
           bar: box(this),
-          textLines: Math.round(text.getBoundingClientRect().height / lineHeight),
-          buttons: [...this.querySelectorAll('button')].map((b) => ({ name: b.getAttribute('aria-label') ?? b.textContent, box: box(b) })),
+          actions: box(this.querySelector('.actions')),
+          barClipped: this.scrollHeight > this.clientHeight || this.scrollWidth > this.clientWidth,
+          text: { visible: norm(text.innerText), lines, cut: [...cut(text), ...(text.scrollHeight > text.clientHeight ? ['text-height'] : [])] },
+          buttons: [...this.querySelectorAll('button')].map((b) => ({
+            visible: norm(b.innerText),
+            label: b.getAttribute('aria-label'),
+            title: b.getAttribute('title'),
+            box: box(b),
+            cut: cut(b),
+          })),
         };
       }`,
     })) as { result: { value: IndicatorLayout } };
@@ -527,29 +553,83 @@ const isInside = (inner: Box, outer: Box): boolean =>
   inner.left >= outer.left && inner.right <= outer.right && inner.top >= outer.top && inner.bottom <= outer.bottom && inner.right > inner.left;
 
 test.describe('hide indicator layout (AC-051, TC-070)', () => {
-  for (const width of [null, 384, 320]) {
-    test(`should keep the indicator within 56 px and 2 text lines with every button inside the bar at ${width ?? 'default'} px`, async ({
+  const LAYOUT_IDS: Record<Platform, [string, string]> = {
+    reddit: ['pf70a', 'pf70b'],
+    wykop: ['93000701', '93000702'],
+    x: ['1870000000000000701', '1870000000000000702'],
+  };
+  const AUTHOR_PREFIX: Record<Platform, string> = { reddit: 'u/', wykop: '@', x: '@' };
+  const STATUS: Record<Platform, RegExp> = {
+    reddit: /^Hidden by PureFeed: (exact|similar), seen on Reddit (just now|\d+ (min|h|d) ago)$/,
+    wykop: /^Hidden by PureFeed: (exact|similar), seen on Wykop (just now|\d+ (min|h|d) ago)$/,
+    x: /^Hidden by PureFeed: (exact|similar), seen on X (just now|\d+ (min|h|d) ago)$/,
+  };
+
+  async function hiddenLayout(context: BrowserContext, platform: Platform, width: number | null, author: string) {
+    const [first, repost] = LAYOUT_IDS[platform];
+    const page = await openFeed(
+      context,
+      platform,
+      `tc070-${width ?? 'default'}-${author.length}`,
+      [imgPost(platform, 'o', first, 'base.png'), imgPost(platform, 'd', repost, 'base-50.png', author)],
+      { css: width === null ? '' : `body { width: ${width}px; }` },
+    );
+    await expect.poll(() => isHidden(page, 'd'), { timeout: 30_000 }).toBe(true);
+    const indicator = await indicatorOf(page, 'd');
+    if (!indicator?.contentBackendNodeId) throw new Error('no indicator');
+    return { page, layout: await indicatorLayout(page, indicator.contentBackendNodeId) };
+  }
+
+  const expectFitting = (layout: IndicatorLayout, platform: Platform) => {
+    expect(layout.bar.bottom - layout.bar.top).toBeLessThanOrEqual(56);
+    expect(layout.barClipped).toBe(false);
+    expect(layout.text.visible).toMatch(STATUS[platform]);
+    expect(layout.text.cut).toEqual([]);
+    expect(layout.text.lines).toBeGreaterThanOrEqual(1);
+    expect(layout.text.lines).toBeLessThanOrEqual(2);
+    expect(layout.buttons.filter((b) => !isInside(b.box, layout.bar) || !isInside(b.box, layout.actions)).map((b) => b.visible)).toEqual([]);
+    expect(new Set(layout.buttons.map((b) => Math.round(b.box.top))).size).toBe(1);
+  };
+
+  for (const platform of ['reddit', 'wykop', 'x'] as const) {
+    const author = `${AUTHOR_PREFIX[platform]}pf_tc070_author`;
+    for (const width of [null, 600, 481, 480, 400, 360]) {
+      test(`should show the full status text and full button labels uncut within 56 px on ${platform} at ${width ?? 'default'} px`, async ({
+        context,
+      }) => {
+        const { layout } = await hiddenLayout(context, platform, width, 'pf_tc070_author');
+        expectFitting(layout, platform);
+        expect(layout.buttons.map((b) => b.visible)).toEqual(['Show', 'Always show this post', `Always show ${author}`]);
+        expect(layout.buttons.map((b) => b.label)).toEqual(['Show', 'Always show this post', `Always show ${author}`]);
+        expect(layout.buttons.flatMap((b) => b.cut)).toEqual([]);
+        if (width === null || width > 480) expect(layout.text.lines).toBe(1);
+      });
+    }
+
+    test(`should keep the full status text and every button fully visible in the compact fallback on ${platform} at 320 px`, async ({
       context,
     }) => {
-      const page = await openFeed(
-        context,
-        'reddit',
-        `tc070-${width ?? 'default'}`,
-        [
-          imgPost('reddit', 'o', `pf70${width ?? 0}a`, 'base.png'),
-          imgPost('reddit', 'd', `pf70${width ?? 0}b`, 'base-50.png', 'pf_tc070_author'),
-        ],
-        { css: width === null ? '' : `body { width: ${width}px; }` },
-      );
-      await expect.poll(() => isHidden(page, 'd'), { timeout: 30_000 }).toBe(true);
-      const indicator = await indicatorOf(page, 'd');
-      if (!indicator?.contentBackendNodeId) throw new Error('no indicator');
-      const layout = await indicatorLayout(page, indicator.contentBackendNodeId);
-      expect(layout.bar.bottom - layout.bar.top).toBeLessThanOrEqual(56);
-      expect(layout.textLines).toBeLessThanOrEqual(2);
-      expect(layout.buttons.map((b) => b.name)).toEqual(['Show', 'Always show this post', 'Always show u/pf_tc070_author']);
-      expect(layout.buttons.filter((b) => !isInside(b.box, layout.bar)).map((b) => b.name)).toEqual([]);
-      expect(new Set(layout.buttons.map((b) => Math.round(b.box.top))).size).toBe(1);
+      const { layout } = await hiddenLayout(context, platform, 320, 'pf_tc070_author');
+      expectFitting(layout, platform);
+      expect(layout.buttons.map((b) => b.visible)).toEqual(['Show', 'this post', author]);
+      expect(layout.buttons.map((b) => b.label)).toEqual(['Show', 'Always show this post', `Always show ${author}`]);
+      expect(layout.buttons.flatMap((b) => b.cut)).toEqual([]);
+    });
+  }
+
+  for (const width of [600, 360]) {
+    test(`should shorten only a long author name with an ellipsis and keep the full name in aria-label and title at ${width} px`, async ({
+      context,
+    }) => {
+      const long = 'pf_tc070_long_author_name_abcdefghijkl';
+      const { layout } = await hiddenLayout(context, 'reddit', width, long);
+      expectFitting(layout, 'reddit');
+      const [show, post, authorButton] = layout.buttons;
+      expect([show.visible, post.visible]).toEqual(['Show', 'Always show this post']);
+      expect([...show.cut, ...post.cut]).toEqual([]);
+      expect(authorButton.visible).toMatch(/^Always show u\/pf_tc070/);
+      expect(authorButton.cut).toEqual(['name']);
+      expect([authorButton.label, authorButton.title]).toEqual([`Always show u/${long}`, `Always show u/${long}`]);
     });
   }
 });

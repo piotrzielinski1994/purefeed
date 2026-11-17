@@ -47,8 +47,9 @@ a {
   overflow: hidden;
 }
 button {
-  display: inline-block;
+  display: flex;
   flex: none;
+  column-gap: 0.25em;
   margin: 0;
   padding: 0 6px;
   border: 1px solid #b8bec5;
@@ -56,13 +57,62 @@ button {
   background: #ffffff;
   cursor: pointer;
 }
+.prefix {
+  flex: none;
+}
 .author {
   flex: 0 1 auto;
+  min-width: 0;
+}
+.author .name {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 @container (max-width: 480px) {
+  .bar {
+    padding: 2px 5px;
+    font-size: 12px;
+    line-height: 1.25;
+  }
+  .text {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    white-space: normal;
+  }
+  .actions {
+    gap: 4px;
+    margin-top: 2px;
+  }
+  button {
+    padding: 0 4px;
+  }
+}
+@container (max-width: 420px) {
+  .bar {
+    font-size: 11px;
+    line-height: 1.3;
+  }
+  .actions {
+    gap: 3px;
+  }
+  button {
+    padding: 0 3px;
+  }
+}
+@container (max-width: 380px) {
+  .bar {
+    padding: 2px 4px;
+  }
+  .actions {
+    gap: 2px;
+  }
+  button {
+    padding: 0 2px;
+  }
+}
+@container (max-width: 355px) {
   .prefix {
     display: none;
   }
