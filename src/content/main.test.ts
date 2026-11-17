@@ -7,7 +7,7 @@ import { DAY_MS, imageFp, randomHashes } from '../../test/helpers/fingerprints.t
 import { fragment, mediaEls, setUrl } from '../../test/helpers/fixtures.ts';
 import { redditImagePost, wykopImageEntry, xPhotoTweet } from '../../test/helpers/platform-markup.ts';
 import { DEFAULT_SETTINGS } from '../shared/settings.ts';
-import type { Platform, Settings } from '../shared/types.ts';
+import type { Platform, Settings, WhitelistEntry } from '../shared/types.ts';
 
 const [HA] = randomHashes(1, 9049);
 const SEEN_A: SeedRecord = {
@@ -40,7 +40,15 @@ const PAGES: Record<Platform, { url: string; src: string; markup: (src: string) 
   },
 };
 
-type Page = { ext: FakeExt; bg: FakeBackground; observers: FakeObservers; post: Element; chrome: { runtime: { id: string | undefined } } };
+type Page = {
+  ext: FakeExt;
+  bg: FakeBackground;
+  observers: FakeObservers;
+  post: Element;
+  others: Element[];
+  chrome: { runtime: { id: string | undefined } };
+};
+type PageExtras = { whitelist?: WhitelistEntry[]; others?: string[] };
 let pages: Page[] = [];
 
 afterEach(() => {
@@ -65,13 +73,14 @@ async function within(ms: number, check: () => boolean): Promise<boolean> {
   }
 }
 
-async function openPage(platform: Platform, url: string, settings: Settings): Promise<Page> {
+async function openPage(platform: Platform, url: string, settings: Settings, extras: PageExtras = {}): Promise<Page> {
   setUrl(url);
   const spec = PAGES[platform];
   const root = fragment(document, spec.markup(spec.src));
-  document.body.append(root);
+  const otherRoots = (extras.others ?? []).map((markup) => fragment(document, markup));
+  document.body.append(root, ...otherRoots);
   const ext = createFakeExt();
-  await ext.storage.local.set({ settings });
+  await ext.storage.local.set({ settings, ...(extras.whitelist ? { whitelist: extras.whitelist } : {}) });
   const bg = createFakeBackground({ media: { [spec.src]: okImage(imageFp(HA)) }, seed: [SEEN_A], now: Date.now });
   const observers = createFakeObservers();
   const chrome = {
@@ -108,9 +117,10 @@ async function openPage(platform: Platform, url: string, settings: Settings): Pr
   await import('./main.ts');
   await settle();
   const post = spec.post(root);
-  observers.enterLookahead(post, ...mediaEls(post));
+  const others = otherRoots.map(spec.post);
+  observers.enterLookahead(...[post, ...others].flatMap((el) => [el, ...mediaEls(el)]));
   await settle();
-  const page = { ext, bg, observers, post, chrome };
+  const page = { ext, bg, observers, post, others, chrome };
   pages.push(page);
   return page;
 }
@@ -174,5 +184,46 @@ describe('content script platform gating (AC-049, TC-068)', () => {
     expect(await within(1000, () => isHidden(post))).toBe(true);
     await ext.storage.local.set({ settings: platformOff('reddit') });
     expect(await within(1000, () => !isHidden(post))).toBe(true);
+  });
+});
+
+describe('stored whitelist in a new page session (AC-054, AC-055, AC-056, TC-073, TC-075)', () => {
+  const TRUSTED_AUTHOR = redditImagePost({ id: '1pfauth', author: 'pf_trusted', src: PAGES.reddit.src });
+  const TRUSTED_SUB = redditImagePost({ id: '1pfsub', author: 'pf_member', sub: 'pf_trusted_sub', src: PAGES.reddit.src });
+  const CONTROL = redditImagePost({ id: '1pfctrl', author: 'pf_other', src: PAGES.reddit.src });
+  const WHITELIST: WhitelistEntry[] = [
+    { type: 'post', key: 'reddit:t3_1pfgate' },
+    { type: 'source', key: 'reddit:u/pf_trusted' },
+    { type: 'source', key: 'reddit:r/pf_trusted_sub' },
+  ];
+
+  it('should keep the whitelisted post, author and subreddit posts visible and hide the other post if the page loads with a stored whitelist', async () => {
+    const { post, others } = await openPage('reddit', PAGES.reddit.url, DEFAULT_SETTINGS, {
+      whitelist: WHITELIST,
+      others: [TRUSTED_AUTHOR, TRUSTED_SUB, CONTROL],
+    });
+    const [author, sub, control] = others;
+    expect(await within(1000, () => isHidden(control))).toBe(true);
+    expect([post, author, sub].map(isHidden)).toEqual([false, false, false]);
+  });
+
+  it('should record the media of a whitelisted post as seen if it stays in view for 1 s (AC-054)', async () => {
+    const { bg, observers, post, others } = await openPage('reddit', PAGES.reddit.url, DEFAULT_SETTINGS, {
+      whitelist: WHITELIST,
+      others: [CONTROL],
+    });
+    expect(await within(1000, () => isHidden(others[0]))).toBe(true);
+    for (const el of mediaEls(post)) observers.setVisible(el, 1);
+    expect(await within(2000, () => bg.of('seen/record').some((r) => r.sighting.postKey === 'reddit:t3_1pfgate'))).toBe(true);
+    expect(isHidden(post)).toBe(false);
+    expect(bg.rows.find((row) => row.recordId === 'seed-0')?.count).toBe(2);
+  });
+
+  it('should hide every post again in the next page session if the whitelist entries are removed (TC-075)', async () => {
+    await openPage('reddit', PAGES.reddit.url, DEFAULT_SETTINGS, { whitelist: WHITELIST, others: [TRUSTED_SUB] });
+    document.body.replaceChildren();
+    vi.resetModules();
+    const { post, others } = await openPage('reddit', PAGES.reddit.url, DEFAULT_SETTINGS, { whitelist: [], others: [TRUSTED_SUB] });
+    expect(await within(1000, () => [post, ...others].every(isHidden))).toBe(true);
   });
 });
