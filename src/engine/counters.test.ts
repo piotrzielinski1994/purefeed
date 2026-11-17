@@ -44,7 +44,7 @@ describe('counters (AC-036, AC-041, AC-061, AC-064)', () => {
     expect(ext.storage.sync.dump()).toEqual({});
   });
 
-  it('should keep the counter values if new counters start after a browser restart (TC-036)', async () => {
+  it('should keep the counter values if new counters start after a browser restart (TC-050)', async () => {
     const first = await setup();
     first.counters.addHidden();
     first.counters.addHidden();

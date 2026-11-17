@@ -45,7 +45,7 @@ describe('image fingerprint (AC-008, AC-009, AC-010)', () => {
     expect(fp.edges.length).toBe(128);
   });
 
-  it('should give equal fingerprints if the same pixels come from 2 different URLs', ASSET_TEST, async () => {
+  it('should give equal fingerprints if the same pixels are fingerprinted twice', ASSET_TEST, async () => {
     const first = await fingerprintAsset('base.png');
     const second = await fingerprintAsset('base.png');
     expect(Array.from(second.hash)).toEqual(Array.from(first.hash));

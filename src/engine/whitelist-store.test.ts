@@ -44,7 +44,7 @@ describe('whitelist store (AC-036, AC-064)', () => {
     expect(ext.storage.local.dump().whitelist).toEqual([SOURCE]);
   });
 
-  it('should keep the entries if a new store starts after a browser restart (TC-036)', async () => {
+  it('should keep the entries if a new store starts after a browser restart (TC-050)', async () => {
     const first = await setup();
     await first.whitelist.add(POST);
     await first.whitelist.add(SOURCE);

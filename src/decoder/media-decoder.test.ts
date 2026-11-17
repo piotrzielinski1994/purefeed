@@ -85,6 +85,16 @@ describe('media decoder (AC-008, AC-012, AC-014, AC-020, AC-021, AC-022, AC-070)
     expect(matchClass(expectOk(result), expected)).toBe('exact');
   });
 
+  it('should give equal fingerprints if the same image bytes come from 2 URLs with another query string and CDN host (TC-009)', async () => {
+    const urls = ['https://i.redd.it/same.png?width=640', 'https://preview.redd.it/same.png?width=320&format=png'];
+    const { decoder, calls } = await setup(Object.fromEntries(urls.map((url) => [url, { asset: 'base.png', mime: 'image/png' }])));
+    const [first, second] = (await Promise.all(urls.map((url) => decoder.decode({ url, contentType: 'image', posterUrl: null })))).map(
+      expectOk,
+    );
+    expect(calls.map((c) => c.url)).toEqual(urls);
+    expect(second).toEqual(first);
+  });
+
   it('should skip with host-not-allowed and start no request if the URL is not on a media CDN host', async () => {
     const { decoder, calls } = await setup();
     const results = await Promise.all([

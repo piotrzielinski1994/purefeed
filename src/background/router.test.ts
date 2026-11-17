@@ -80,7 +80,7 @@ describe('background router (AC-007, AC-036, AC-040, AC-041, AC-061, AC-064)', (
     expect(response.matches[0]?.recordId).toBe(recordId);
   });
 
-  it('should keep records, settings, whitelist and counters if the browser restarts (TC-036)', async () => {
+  it('should keep records, settings, whitelist and counters if the browser restarts (TC-050)', async () => {
     const first = await boot();
     const entry: WhitelistEntry = { type: 'source', key: 'reddit:r/memes' };
     await first.send(record(A));

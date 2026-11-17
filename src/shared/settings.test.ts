@@ -39,7 +39,7 @@ describe('settings defaults and source (AC-036, AC-064)', () => {
     expect(source.get()).toEqual({ ...SPEC_DEFAULTS, retentionDays: 90, toast: false });
   });
 
-  it('should keep a changed setting if a new source starts after a browser restart (TC-036)', async () => {
+  it('should keep a changed setting if a new source starts after a browser restart (TC-050)', async () => {
     const { createSettingsSource } = await loadSettings();
     const ext = createFakeExt();
     await ext.storage.local.set({ settings: { ...SPEC_DEFAULTS, mode: 'exact', exactThreshold: 97 } });
