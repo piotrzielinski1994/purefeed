@@ -733,6 +733,105 @@ test.describe('cross-platform flows on local Wykop, Reddit and X feeds (AC-029, 
   });
 });
 
+const UI_STYLE_PROPS = [
+  'display',
+  'visibility',
+  'position',
+  'font-family',
+  'font-size',
+  'font-weight',
+  'line-height',
+  'color',
+  'background-color',
+  'border-top-width',
+  'border-bottom-width',
+  'padding-top',
+  'padding-left',
+  'margin-top',
+  'margin-left',
+  'opacity',
+];
+
+type UiNodeSnapshot = { tag: string; text: string; box: number[] | null; style: Record<string, string> };
+
+async function uiSnapshot(page: Page, hostBackendNodeId: number): Promise<UiNodeSnapshot[]> {
+  const cdp = await page.context().newCDPSession(page);
+  try {
+    await cdp.send('DOM.enable');
+    await cdp.send('CSS.enable');
+    const { root } = (await cdp.send('DOM.getDocument', { depth: -1, pierce: true })) as { root: DomNode & { nodeId: number } };
+    type Node = DomNode & { nodeId: number };
+    const find = (n: Node): Node | null =>
+      n.backendNodeId === hostBackendNodeId ? n : (kidsOf(n) as Node[]).reduce<Node | null>((hit, c) => hit ?? find(c), null);
+    const host = find(root);
+    if (!host) throw new Error('UI host not found');
+    const hostBox = ((await cdp.send('DOM.getBoxModel', { nodeId: host.nodeId })) as { model: { border: number[] } }).model.border;
+    const elements = (n: Node): Node[] => (kidsOf(n) as Node[]).flatMap((c) => [...(c.nodeType === 1 ? [c] : []), ...elements(c)]);
+    const snapshot: UiNodeSnapshot[] = [];
+    for (const el of elements(host).filter((e) => !['STYLE', 'SCRIPT'].includes(e.nodeName))) {
+      const box = await cdp
+        .send('DOM.getBoxModel', { nodeId: el.nodeId })
+        .then((r) => (r as { model: { border: number[] } }).model.border.map((v, k) => Math.round((v - hostBox[k % 2]) * 100) / 100))
+        .catch(() => null);
+      const { computedStyle } = (await cdp.send('CSS.getComputedStyleForNode', { nodeId: el.nodeId })) as {
+        computedStyle: Array<{ name: string; value: string }>;
+      };
+      snapshot.push({
+        tag: el.nodeName,
+        text: norm(textOf(el)),
+        box,
+        style: Object.fromEntries(computedStyle.filter((p) => UI_STYLE_PROPS.includes(p.name)).map((p) => [p.name, p.value])),
+      });
+    }
+    return snapshot;
+  } finally {
+    await cdp.detach();
+  }
+}
+
+test.describe('page CSS isolation on Wykop and X (AC-060)', () => {
+  const IDS: Record<'wykop' | 'x', [string, string, string, string]> = {
+    wykop: ['93000801', '93000802', '93000811', '93000812'],
+    x: ['1870000000000000801', '1870000000000000802', '1870000000000000811', '1870000000000000812'],
+  };
+  for (const platform of ['wykop', 'x'] as const) {
+    test(`should lay out and style every node of the indicator and the toast the same on a ${platform} page whose CSS hides buttons and enlarges fonts (TC-080)`, async ({
+      context,
+    }) => {
+      const views: Partial<Record<'plain' | 'hostile', { indicator: UiNodeSnapshot[]; toast: UiNodeSnapshot[]; pageButton: string }>> = {};
+      for (const [i, variant] of (['plain', 'hostile'] as const).entries()) {
+        const [original, repost] = IDS[platform].slice(i * 2, i * 2 + 2);
+        const page = await openFeed(
+          context,
+          platform,
+          `tc080-${variant}`,
+          [imgPost(platform, 'o', original, 'base.png'), imgPost(platform, 'd', repost, 'base-50.png', 'pf_tc080')],
+          { css: variant === 'hostile' ? 'button { display: none } * { font-size: 40px }' : '' },
+        );
+        await expect.poll(() => isHidden(page, 'd'), { timeout: 30_000 }).toBe(true);
+        const toast = await toastOf(page);
+        const indicator = await indicatorOf(page, 'd');
+        if (!toast || !indicator) throw new Error(`no toast or indicator on the ${variant} ${platform} page`);
+        expect(indicator.buttons.map((b) => b.name)).toEqual(['Show', 'Always show this post', 'Always show @pf_tc080']);
+        views[variant] = {
+          indicator: await uiSnapshot(page, indicator.backendNodeId),
+          toast: await uiSnapshot(page, toast.backendNodeId),
+          pageButton: await page.evaluate(() => {
+            const button = document.body.appendChild(document.createElement('button'));
+            return `${getComputedStyle(button).display} ${getComputedStyle(button).fontSize}`;
+          }),
+        };
+        await page.close();
+      }
+      expect([views.plain?.pageButton, views.hostile?.pageButton]).toEqual([expect.not.stringMatching(/^none /), 'none 40px']);
+      expect(views.plain?.indicator.length).toBeGreaterThan(5);
+      expect(views.plain?.indicator.filter((n) => n.tag === 'BUTTON' && n.box !== null)).toHaveLength(3);
+      expect(views.hostile?.indicator).toEqual(views.plain?.indicator);
+      expect(views.hostile?.toast).toEqual(views.plain?.toast);
+    });
+  }
+});
+
 type Box = { left: number; top: number; right: number; bottom: number };
 type IndicatorLayout = {
   bar: Box;
