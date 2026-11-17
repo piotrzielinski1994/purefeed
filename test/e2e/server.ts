@@ -25,6 +25,12 @@ const CERT_DIR = join(ROOT, '.cache', 'e2e-cert');
 const FIXTURES_DIR = join(ROOT, 'test', 'fixtures');
 const NO_CORS_HOST = 'media2.test';
 const CHUNK_BYTES = 64 * 1024;
+const PAGES = new Map<string, string>();
+
+export function servePage(url: string, html: string): void {
+  const u = new URL(url);
+  PAGES.set(`${u.hostname}${u.pathname}${u.search}`, html);
+}
 
 const MIME: Record<string, string> = {
   '.html': 'text/html; charset=utf-8',
@@ -146,6 +152,13 @@ function handle(req: IncomingMessage, res: ServerResponse, log: RequestLogEntry[
     referer: header(req, 'referer'),
   };
   log.push(entry);
+  const page = PAGES.get(`${host}${url.pathname}${url.search}`);
+  if (page !== undefined) {
+    entry.status = 200;
+    res.writeHead(200, { 'Content-Type': MIME['.html'], 'Cache-Control': 'no-store' });
+    res.end(page, () => (entry.bytesSent += Buffer.byteLength(page)));
+    return;
+  }
   if (host !== NO_CORS_HOST && url.pathname.startsWith('/redirect-nocors/')) {
     entry.status = 302;
     res.writeHead(302, { Location: `https://${NO_CORS_HOST}/${basename(url.pathname)}` });

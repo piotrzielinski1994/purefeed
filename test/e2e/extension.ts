@@ -39,6 +39,33 @@ export async function sendFromPage<K extends RequestType>(
   ) as Promise<ResponseOf<K>>;
 }
 
+export const catchAllHostRule = (port: number): string => `MAP * 127.0.0.1:${port}`;
+
+export async function launchExtension(
+  userDataDir: string,
+  hostRules: string,
+  opts: { viewport?: { width: number; height: number }; args?: string[] } = {},
+): Promise<BrowserContext> {
+  return chromium.launchPersistentContext(userDataDir, {
+    channel: 'chromium',
+    headless: !process.env.HEADED,
+    ignoreHTTPSErrors: true,
+    viewport: opts.viewport ?? { width: 1280, height: 900 },
+    args: [
+      `--disable-extensions-except=${EXTENSION_DIR}`,
+      `--load-extension=${EXTENSION_DIR}`,
+      `--host-resolver-rules=${hostRules}`,
+      '--ignore-certificate-errors',
+      ...(opts.args ?? []),
+    ],
+  });
+}
+
+export async function extensionIdOf(context: BrowserContext): Promise<string> {
+  const worker = context.serviceWorkers()[0] ?? (await context.waitForEvent('serviceworker'));
+  return new URL(worker.url()).host;
+}
+
 type WorkerVersion = { runningStatus: string; scriptURL: string };
 
 export async function stopServiceWorkers(context: BrowserContext, page: Page, timeoutMs = 15_000): Promise<void> {
