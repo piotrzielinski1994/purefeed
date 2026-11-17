@@ -948,3 +948,29 @@ describe('content runtime hide indicator and toast (AC-029, AC-051, AC-053, AC-0
     expect(toastTexts()).toEqual([]);
   });
 });
+
+describe('content runtime out-of-order completion (AC-033)', () => {
+  it('should hide the later post and keep the earlier one visible if the later post finishes fingerprinting first (TC-046)', async () => {
+    const { start, reveal, bg, posts } = await setup({
+      hold: true,
+      posts: [
+        { id: 'oo1', top: 0, media: [img(IMG.a)] },
+        { id: 'oo2', top: 500, media: [img(IMG.c)] },
+        { id: 'oo3', top: 1000, media: [img(IMG.aCopy)] },
+      ],
+    });
+    await start();
+    await reveal(...posts);
+    const release = async (url: string) => {
+      const index = bg.gate.pending.findIndex((p) => p.url === url);
+      bg.gate.pending.splice(index, 1)[0].release();
+      await settle();
+    };
+    expect(bg.gate.pending.map((p) => p.url)).toEqual([IMG.a, IMG.c, IMG.aCopy]);
+    await release(IMG.aCopy);
+    expect(posts.map(isHidden)).toEqual([false, false, false]);
+    await release(IMG.c);
+    await release(IMG.a);
+    expect(posts.map(isHidden)).toEqual([false, false, true]);
+  });
+});
