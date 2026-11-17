@@ -228,4 +228,14 @@ describe('repo commands (AC-006)', () => {
       expect(res.status, `npm run ${script}\n${res.stdout}\n${res.stderr}`).toBe(0);
     }
   });
+
+  it('should report 0 errors if npm run lint:firefox checks a fresh build (AC-003)', { timeout: 600_000 }, () => {
+    const built = spawnSync('npm', ['run', 'build'], { cwd: ROOT, encoding: 'utf8' });
+    expect(built.status, `npm run build\n${built.stdout}\n${built.stderr}`).toBe(0);
+    const lint = spawnSync('npm', ['run', 'lint:firefox', '--', '--output', 'json'], { cwd: ROOT, encoding: 'utf8' });
+    expect(lint.status, `npm run lint:firefox\n${lint.stdout}\n${lint.stderr}`).toBe(0);
+    const report: { summary: { errors: number }; errors: Array<{ code: string }> } = JSON.parse(lint.stdout.slice(lint.stdout.indexOf('{')));
+    expect(report.errors.map((e) => e.code)).toEqual([]);
+    expect(report.summary.errors).toBe(0);
+  });
 });
