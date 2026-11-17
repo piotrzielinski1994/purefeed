@@ -119,6 +119,7 @@ A hidden post stays in the page; a bar takes its place:
 | `npm run lint`         | Biome lint and format check                                                |
 | `npm run typecheck`    | TypeScript check of page code and worker code                              |
 | `npm test`             | Unit, DOM, architecture, build, bundle scan and README tests with coverage |
+| `npm run test:perf`    | Lookup speed test with 50,000 records, serial; `npm test` runs it last     |
 | `npm run build`        | Build `dist/`                                                              |
 | `npm run lint:firefox` | `web-ext lint` of `dist/firefox`                                           |
 | `npm run test:e2e`     | Build, then Chromium E2E tests on local fixture feeds                      |
@@ -223,7 +224,7 @@ A hidden post stays in the page; a bar takes its place:
 | AC-075 | No long task, hashing off the main thread            | `src/decoder/worker-client.test.ts`, `test/e2e/performance.spec.ts`                                                            |
 | AC-076 | 4 jobs, nearest first                                | `src/content/lookahead-queue.test.ts`, `src/content/runtime.test.ts`                                                           |
 | AC-077 | Duplicates hidden before half visible                | `test/e2e/performance.spec.ts`                                                                                                 |
-| AC-078 | Lookup p95 with 50,000 records                       | `src/repository/seen-repository.test.ts`                                                                                       |
+| AC-078 | Lookup p95 with 50,000 records                       | `src/repository/seen-repository.perf.test.ts`                                                                                  |
 | AC-079 | README content                                       | `test/build/readme.test.ts`                                                                                                    |
 | AC-080 | Synthetic test assets                                | `test/assets/generate-assets.test.ts`                                                                                          |
 | AC-081 | Test categories mapped                               | `test/build/readme.test.ts`                                                                                                    |
