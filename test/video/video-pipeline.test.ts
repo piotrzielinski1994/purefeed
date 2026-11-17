@@ -1,19 +1,26 @@
 // @vitest-environment happy-dom
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { fingerprintImage } from '../../src/fingerprint/image-fingerprint.ts';
 import type { SeenMatch } from '../../src/shared/types.ts';
 import { decodeDecodeResult, type WireDecodeResult } from '../../src/shared/wire.ts';
 import { orderedMatchPercent } from '../../src/similarity/sequence.ts';
+import { loadGray } from '../helpers/assets.ts';
 import { createFakeClock, settle } from '../helpers/fake-ext.ts';
 import { type FakeMedia, installFakeMedia, videoFromAsset } from '../helpers/fake-media.ts';
 import { createFakeObservers } from '../helpers/fake-observers.ts';
 import { DEFAULT_THRESHOLDS } from '../helpers/fingerprints.ts';
 import { createRealBackground } from '../helpers/real-background.ts';
-import { createTestAdapter, type MediaSpec, makeFeed, mediaOf } from '../helpers/test-adapter.ts';
+import { createTestAdapter, type MediaSpec, makeFeed, mediaOf, type PostSpec } from '../helpers/test-adapter.ts';
 
 const loadRuntime = () => import('../../src/content/runtime.ts');
 
 const ASSET_TEST = { timeout: 60_000 };
 const GIF_URL = 'https://i.redd.it/loop.gif';
+const POSTER_URL = 'https://pbs.twimg.com/ext_tw_video_thumb/1/pu/img/poster.png';
+const TAINTED_URLS = ['https://video.twimg.com/redirect-nocors/a.mp4', 'https://video.twimg.com/redirect-nocors/b.mp4'];
+const NO_DURATION_URL = 'https://wykop.pl/stall/clip.mp4';
+const NO_FRAME_URL = 'https://wykop.pl/stall/frames.mp4';
+const FRAME_TIMEOUT_MS = 10_000;
 const VIDEO_ASSETS = ['clip.mp4', 'clip-720.mp4', 'clip-360.webm', 'clip-intro.mp4', 'clip-outro.mp4', 'other.mp4', 'loop.mp4'];
 const blobOf = (asset: string) => `blob:https://www.reddit.com/pf-${asset.replace('.', '-')}`;
 const video = (asset: string): MediaSpec => ({ kind: 'video', src: blobOf(asset), width: 640, height: 360 });
@@ -26,6 +33,11 @@ beforeEach(() => {
   VIDEO_ASSETS.forEach((asset) => {
     media.addVideo(blobOf(asset), videoFromAsset(asset));
   });
+  TAINTED_URLS.forEach((url) => {
+    media.addVideo(url, { mode: 'tainted', durationS: 20 });
+  });
+  media.addVideo(NO_DURATION_URL, { mode: 'never-loads' });
+  media.addVideo(NO_FRAME_URL, { mode: 'stalls-on-seek', durationS: 20 });
 });
 
 afterEach(() => {
@@ -49,12 +61,15 @@ async function playToEnd(el: HTMLVideoElement) {
 
 async function pipeline() {
   const clock = createFakeClock();
-  const bg = await createRealBackground({ routes: { [GIF_URL]: { asset: 'loop.gif', mime: 'image/gif' } }, clock });
+  const bg = await createRealBackground({
+    routes: { [GIF_URL]: { asset: 'loop.gif', mime: 'image/gif' }, [POSTER_URL]: { asset: 'base.png', mime: 'image/png' } },
+    clock,
+  });
   const { createContentRuntime } = await loadRuntime();
-  const session = async (id: string, spec: MediaSpec) => {
+  const open = async (specs: PostSpec[]) => {
     document.body.replaceChildren();
     const observers = createFakeObservers();
-    const { posts } = makeFeed(document, [{ id, media: [spec] }]);
+    const { posts } = makeFeed(document, specs);
     const runtime = createContentRuntime({
       adapter: createTestAdapter('reddit'),
       doc: document,
@@ -68,31 +83,34 @@ async function pipeline() {
     running.push(runtime);
     runtime.start();
     await settle();
-    observers.enterLookahead(posts[0]);
+    observers.enterLookahead(...posts);
     await settle();
+    return { runtime, observers, posts };
+  };
+  const outcome = async (id: string, spec: MediaSpec) => {
+    const before = bg.exchanges.length;
+    const { runtime, observers, posts } = await open([{ id, media: [spec] }]);
     const el = mediaOf(posts[0]);
     if (el instanceof HTMLVideoElement) await playToEnd(el);
     observers.setVisible(el, 1);
     await clock.advance(1000);
-    const post = posts[0];
     runtime.stop();
-    return post;
-  };
-  const sequenceOf = async (id: string, spec: MediaSpec) => {
-    const before = bg.exchanges.length;
-    const post = await session(id, spec);
-    const decoded = bg.exchanges
-      .slice(before)
+    const exchanges = bg.exchanges.slice(before);
+    const decoded = exchanges
       .filter((e) => e.req.type === 'media/frames' || e.req.type === 'media/fingerprint')
       .map((e) => decodeDecodeResult(e.res as WireDecodeResult));
-    const lookups = bg.exchanges.slice(before).filter((e) => e.req.type === 'seen/lookup');
+    const lookups = exchanges.filter((e) => e.req.type === 'seen/lookup');
     const match = (lookups.at(-1)?.res as { matches: Array<SeenMatch | null> } | undefined)?.matches[0] ?? null;
-    const result = decoded.at(-1);
+    return { result: decoded.at(-1), match, isHidden: posts[0].hasAttribute('data-purefeed-hidden') };
+  };
+  const sequenceOf = async (id: string, spec: MediaSpec) => {
+    const { result, match, isHidden } = await outcome(id, spec);
     if (result?.status !== 'ok' || result.fingerprint.kind !== 'sequence')
       throw new Error(`${id}: no frame sequence ${JSON.stringify(result)}`);
-    return { fingerprint: result.fingerprint, contentType: result.contentType, match, isHidden: post.hasAttribute('data-purefeed-hidden') };
+    return { fingerprint: result.fingerprint, contentType: result.contentType, match, isHidden };
   };
-  return { bg, sequenceOf };
+  const framesRequests = () => bg.exchanges.filter((e) => e.req.type === 'media/frames');
+  return { bg, clock, open, outcome, sequenceOf, framesRequests };
 }
 
 describe('page video to stored frame sequence through runtime, background, decoder and hash worker (AC-015 to AC-019)', () => {
@@ -165,5 +183,67 @@ describe('page video to stored frame sequence through runtime, background, decod
       { recordId: 'rec-1', isNew: true },
       { recordId: 'rec-2', isNew: true },
     ]);
+  });
+});
+
+describe('unreadable page video frames through runtime, background, decoder and hash worker (AC-022)', () => {
+  const posterVideo = (src: string): MediaSpec => ({ kind: 'video', src, poster: POSTER_URL, width: 640, height: 360 });
+  const plainVideo = (src: string): MediaSpec => ({ kind: 'video', src, width: 640, height: 360 });
+
+  it('should store the poster pixels as a poster-only fingerprint of a tainted page video and hide a later tainted video with that poster (TC-028)', async () => {
+    const { bg, outcome, framesRequests } = await pipeline();
+    const first = await outcome('t1', posterVideo(TAINTED_URLS[0]));
+    expect(framesRequests().map((e) => e.req)).toEqual([{ type: 'media/frames', frames: [], durationS: 20, posterUrl: POSTER_URL }]);
+    expect(first.result).toEqual({
+      status: 'ok',
+      contentType: 'video',
+      fingerprint: { kind: 'poster', hash: fingerprintImage(loadGray('base.png'))?.hash },
+    });
+    expect(bg.fetchCalls.map((c) => c.url)).toEqual([POSTER_URL]);
+    expect(bg.workerJobs).toEqual(['image']);
+    const second = await outcome('t2', posterVideo(TAINTED_URLS[1]));
+    expect([second.match?.matchClass, second.isHidden]).toEqual(['exact', true]);
+  });
+
+  it('should skip a page video without duration and poster exactly 10 s after it enters the lookahead and hide neither of 2 posts carrying it (TC-029)', async () => {
+    const { bg, clock, open, framesRequests } = await pipeline();
+    const { observers, posts } = await open([
+      { id: 'n1', top: 0, media: [plainVideo(NO_DURATION_URL)] },
+      { id: 'n2', top: 600, media: [plainVideo(NO_DURATION_URL)] },
+    ]);
+    await clock.advance(FRAME_TIMEOUT_MS - 1);
+    expect(framesRequests()).toEqual([]);
+    await clock.advance(1);
+    expect(framesRequests().map((e) => [e.req, e.res])).toEqual(
+      Array.from({ length: 2 }, () => [
+        { type: 'media/frames', frames: [], durationS: 0, posterUrl: null },
+        { status: 'skipped', reason: 'no-poster' },
+      ]),
+    );
+    posts.forEach((post) => {
+      observers.setVisible(mediaOf(post), 1);
+    });
+    await clock.advance(1000);
+    expect(posts.map((post) => post.hasAttribute('data-purefeed-hidden'))).toEqual([false, false]);
+    expect(bg.exchanges.filter((e) => e.req.type === 'seen/lookup' || e.req.type === 'seen/record')).toEqual([]);
+    expect(bg.fetchCalls).toEqual([]);
+  });
+
+  it('should fall back to the poster exactly 10 s after sampling starts if the page video delivers no frame (AC-022)', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      const { open, framesRequests } = await pipeline();
+      await open([{ id: 'f1', media: [posterVideo(NO_FRAME_URL)] }]);
+      vi.advanceTimersByTime(FRAME_TIMEOUT_MS - 1);
+      await settle();
+      expect(framesRequests()).toEqual([]);
+      vi.advanceTimersByTime(1);
+      await settle();
+      expect(framesRequests().map((e) => [e.req, (e.res as WireDecodeResult).status])).toEqual([
+        [{ type: 'media/frames', frames: [], durationS: 20, posterUrl: POSTER_URL }, 'ok'],
+      ]);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

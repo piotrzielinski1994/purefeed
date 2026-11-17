@@ -1,7 +1,7 @@
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import type { BrowserContext, Page } from '@playwright/test';
+import type { BrowserContext, Page, Worker } from '@playwright/test';
 import { MEDIA_HOSTS, PLATFORM_HOSTS } from '../../src/shared/hosts.ts';
 import { DEFAULT_SETTINGS } from '../../src/shared/settings.ts';
 import type { Platform } from '../../src/shared/types.ts';
@@ -163,7 +163,7 @@ const imgPost = (platform: Platform, index: string, id: string, asset: string, a
   media: { kind: 'img', src: mediaUrl(platform, asset, index) },
   marks: { 'data-pf-index': index },
 });
-const videoEntry = (index: string, id: string, src: string, extra: { muted?: boolean; loop?: boolean } = {}): FeedPost => ({
+const videoEntry = (index: string, id: string, src: string, extra: { muted?: boolean; loop?: boolean; poster?: string } = {}): FeedPost => ({
   id,
   author: `pf_${index}`,
   media: { kind: 'video', src, ...extra },
@@ -346,6 +346,104 @@ test.describe('passive page video sampling in Chromium (AC-015, AC-017, AC-018, 
     expect((await indicatorOf(later, 'r1'))?.text).toMatch(/Hidden by PureFeed: exact, seen on Wykop/);
     expect((await indicatorOf(later, 'r2'))?.text).toMatch(/Hidden by PureFeed: similar, seen on Wykop/);
     expect(extensionVideoTraffic(server.log)).toEqual([]);
+  });
+});
+
+type FramesMessage = { count: number; posterUrl: string | null; at: number };
+
+async function recordFramesMessages(worker: Worker): Promise<() => Promise<FramesMessage[]>> {
+  await worker.evaluate(() => {
+    type Frames = { type?: string; frames?: unknown[]; posterUrl?: string | null };
+    const g = globalThis as unknown as {
+      __pfFramesAt: FramesMessage[];
+      chrome: { runtime: { onMessage: { addListener(l: (m: Frames) => void): void } } };
+    };
+    g.__pfFramesAt = [];
+    g.chrome.runtime.onMessage.addListener((m) => {
+      if (m?.type === 'media/frames') g.__pfFramesAt.push({ count: m.frames?.length ?? 0, posterUrl: m.posterUrl ?? null, at: Date.now() });
+    });
+  });
+  return () => worker.evaluate(() => (globalThis as unknown as { __pfFramesAt: FramesMessage[] }).__pfFramesAt);
+}
+
+test.describe('unreadable page video frames in Chromium (AC-022)', () => {
+  test('should give a cross-origin page video without pixel access a poster-only fingerprint and hide another such video with the same poster (TC-028)', async ({
+    context,
+    serviceWorker,
+    extensionPage,
+    server,
+  }) => {
+    test.setTimeout(120_000);
+    const frames = await recordFramesMessages(serviceWorker);
+    const poster = 'https://wykop.pl/cdn/c3201142/base.png?pf=tc028-poster';
+    const first = await openFeed(context, 'wykop', 'tc028-seen', [
+      videoEntry('t1', '93000051', 'https://video.twimg.com/redirect-nocors/clip.mp4?pf=tc028a', { poster }),
+    ]);
+    await expect.poll(() => uniqueItems(extensionPage), { timeout: 60_000 }).toBe(1);
+    const loadedAt = await first.evaluate(() => performance.timeOrigin);
+    const received = await frames();
+    expect(received).toEqual([{ count: 0, posterUrl: poster, at: expect.any(Number) }]);
+    expect(received[0].at - loadedAt).toBeLessThan(10_000);
+    expect(
+      await first.evaluate(() => {
+        const video = document.querySelector('video') as HTMLVideoElement;
+        const context = document.createElement('canvas').getContext('2d') as CanvasRenderingContext2D;
+        context.drawImage(video, 0, 0);
+        try {
+          context.getImageData(0, 0, 1, 1);
+          return `readable ${video.readyState}`;
+        } catch (error) {
+          return `${(error as DOMException).name} ${video.readyState}`;
+        }
+      }),
+    ).toMatch(/^SecurityError [234]$/);
+    const pageVideo = server.log.filter(
+      (e) => e.path.startsWith('/redirect-nocors/clip.mp4') || (e.host === 'media2.test' && e.path === '/clip.mp4'),
+    );
+    expect(pageVideo.map((e) => [e.host, e.fromExtension])).toEqual(
+      expect.arrayContaining([
+        ['video.twimg.com', false],
+        ['media2.test', false],
+      ]),
+    );
+    expect(pageVideo.every((e) => !e.fromExtension)).toBe(true);
+    await first.close();
+
+    const later = await openFeed(context, 'wykop', 'tc028-repost', [
+      videoEntry('t2', '93000052', 'https://video.twimg.com/redirect-nocors/other.mp4?pf=tc028b', { poster }),
+    ]);
+    await expect.poll(() => isHidden(later, 't2'), { timeout: 60_000 }).toBe(true);
+    expect((await indicatorOf(later, 't2'))?.text).toMatch(/^Hidden by PureFeed: exact, seen on Wykop/);
+    expect(extensionVideoTraffic(server.log)).toEqual([]);
+  });
+
+  test('should skip a stalled page video without a poster 10 s after load and hide neither of 2 posts carrying it (TC-029)', async ({
+    context,
+    serviceWorker,
+    extensionPage,
+    server,
+  }) => {
+    test.setTimeout(120_000);
+    const frames = await recordFramesMessages(serviceWorker);
+    const stalled = 'https://wykop.pl/stall/clip.mp4?pf=tc029';
+    const page = await openFeed(context, 'wykop', 'tc029', [videoEntry('s1', '93000061', stalled), videoEntry('s2', '93000062', stalled)]);
+    const loadedAt = await page.evaluate(() => performance.timeOrigin);
+    await expect.poll(async () => (await frames()).length, { timeout: 30_000 }).toBe(2);
+    const received = await frames();
+    expect(received.map((m) => [m.count, m.posterUrl])).toEqual([
+      [0, null],
+      [0, null],
+    ]);
+    received.forEach((m) => {
+      expect(m.at - loadedAt).toBeGreaterThanOrEqual(10_000);
+      expect(m.at - loadedAt).toBeLessThan(20_000);
+    });
+    await page.waitForTimeout(1_500);
+    expect([await isHidden(page, 's1'), await isHidden(page, 's2')]).toEqual([false, false]);
+    expect(await uniqueItems(extensionPage)).toBe(0);
+    const stallRequests = server.log.filter((e) => e.path.startsWith('/stall/clip.mp4'));
+    expect(stallRequests.length).toBeGreaterThan(0);
+    expect(stallRequests.filter((e) => e.fromExtension)).toEqual([]);
   });
 });
 
