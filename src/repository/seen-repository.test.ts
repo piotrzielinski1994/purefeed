@@ -344,3 +344,56 @@ describe('seen repository store faults (AC-040)', () => {
     expect(repo.lookup(imageFp(A), DEFAULT_THRESHOLDS)).toBeNull();
   });
 });
+
+describe('seen repository IndexedDB write transactions (AC-039)', () => {
+  it('should open at most 60 readwrite transactions in 60 s and put each queued record within 2 s if sightings arrive every 100 ms (TC-055)', async () => {
+    const { IDBDatabase, IDBFactory, IDBObjectStore } = await import('fake-indexeddb');
+    const { openIdbSeenStore } = await import('./idb-seen-store.ts');
+    const { createSeenRepository } = await loadRepository();
+    const clock = createFakeClock();
+    const transactions: Array<{ at: number; mode: string }> = [];
+    const puts: Array<{ at: number; id: string }> = [];
+    const transaction = IDBDatabase.prototype.transaction;
+    const put = IDBObjectStore.prototype.put;
+    IDBDatabase.prototype.transaction = function (this: InstanceType<typeof IDBDatabase>, ...args: Parameters<typeof transaction>) {
+      transactions.push({ at: clock.now(), mode: args[1] ?? 'readonly' });
+      return transaction.apply(this, args);
+    };
+    IDBObjectStore.prototype.put = function (this: InstanceType<typeof IDBObjectStore>, ...args: Parameters<typeof put>) {
+      puts.push({ at: clock.now(), id: String(args[1]) });
+      return put.apply(this, args);
+    };
+    try {
+      let lastId = 0;
+      const repo = createSeenRepository({
+        openStore: () => openIdbSeenStore(new IDBFactory()),
+        now: clock.now,
+        setTimer: clock.setTimer,
+        newId: () => {
+          lastId += 1;
+          return `id-${lastId}`;
+        },
+      });
+      await repo.ready;
+      const start = clock.now();
+      const queuedAt = new Map<string, number>();
+      for (const [i, hash] of randomHashes(600, 55).entries()) {
+        const { id } = repo.recordSighting(sightingOf(imageFp(hash), { postKey: `reddit:t3_${i}` }), DEFAULT_THRESHOLDS);
+        queuedAt.set(id, clock.now());
+        await clock.advance(100);
+      }
+      await clock.advance(2000);
+      const writeTimes = transactions.filter((t) => t.mode === 'readwrite' && t.at < start + 60_000).map((t) => t.at);
+      expect(writeTimes.length).toBeGreaterThan(0);
+      expect(writeTimes.length).toBeLessThanOrEqual(60);
+      writeTimes.slice(1).forEach((at, i) => {
+        expect(at - writeTimes[i]).toBeGreaterThanOrEqual(1000);
+      });
+      const late = [...queuedAt].filter(([id, at]) => !puts.some((p) => p.id === id && p.at >= at && p.at - at <= 2000));
+      expect(late).toEqual([]);
+    } finally {
+      IDBDatabase.prototype.transaction = transaction;
+      IDBObjectStore.prototype.put = put;
+    }
+  });
+});
