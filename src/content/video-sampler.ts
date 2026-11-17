@@ -34,7 +34,7 @@ export function createVideoSampler(
 
   const finish = () => {
     dispose();
-    opts.onDone(frames.length > 0 ? frames.toSorted((a, b) => a.tS - b.tS) : null);
+    opts.onDone(remaining.size === 0 ? frames.toSorted((a, b) => a.tS - b.tS) : null);
   };
 
   const armTimeout = () => {

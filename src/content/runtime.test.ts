@@ -1,5 +1,6 @@
 // @vitest-environment happy-dom
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { loadGray } from '../../test/helpers/assets.ts';
 import { createFakeClock, settle } from '../../test/helpers/fake-ext.ts';
 import { type FakeMedia, installFakeMedia, videoFromAsset } from '../../test/helpers/fake-media.ts';
 import { createFakeObservers } from '../../test/helpers/fake-observers.ts';
@@ -27,6 +28,8 @@ const IMG = {
 };
 const CLIP_BLOB = 'blob:https://www.reddit.com/0b0f5c1e-0000-4000-8000-000000000001';
 const CLIP_BLOB_2 = 'blob:https://www.reddit.com/0b0f5c1e-0000-4000-8000-000000000002';
+const INTRO_BLOB_A = 'blob:https://www.reddit.com/0b0f5c1e-0000-4000-8000-000000000003';
+const INTRO_BLOB_B = 'blob:https://www.reddit.com/0b0f5c1e-0000-4000-8000-000000000004';
 const WYKOP_CLIP = 'https://wykop.pl/cdn/c3201142/clip.mp4';
 const GIF_VIDEO = 'https://video.twimg.com/tweet_video/gif1.mp4';
 const GIF_POSTER = 'https://pbs.twimg.com/tweet_video_thumb/gif1.jpg';
@@ -666,6 +669,36 @@ describe('content runtime page videos (AC-014, AC-015, AC-020, AC-021, AC-022)',
       20,
     );
     expect(posts.map(isHidden)).toEqual([false, true]);
+  });
+
+  it('should not hide a video that shares only its opening with a seen video if the timeout cuts sampling short (AC-015)', async () => {
+    const SHARED_INTRO_S = 5;
+    const DURATION_S = 20;
+    const SAMPLER_TIMEOUT_MS = 10_000;
+    const [intro, endA, endB] = ['base.png', 'other-1.png', 'other-2.png'].map(loadGray);
+    media.addVideo(INTRO_BLOB_A, { mode: 'ok', durationS: DURATION_S, frame: (tS) => (tS < SHARED_INTRO_S ? intro : endA) });
+    media.addVideo(INTRO_BLOB_B, { mode: 'ok', durationS: DURATION_S, frame: (tS) => (tS < SHARED_INTRO_S ? intro : endB) });
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      const { start, reveal, bg, posts } = await setup({
+        posts: [
+          { id: 'ia', top: 0, media: [{ kind: 'video', src: INTRO_BLOB_A, width: 640, height: 360 }] },
+          { id: 'ib', top: 600, media: [{ kind: 'video', src: INTRO_BLOB_B, width: 640, height: 360 }] },
+        ],
+      });
+      await start();
+      await reveal(...posts);
+      await playVideos(
+        posts.map((p) => mediaOf(p) as HTMLVideoElement),
+        SHARED_INTRO_S,
+      );
+      vi.advanceTimersByTime(SAMPLER_TIMEOUT_MS);
+      await settle();
+      expect(bg.of('media/frames').map((r) => r.frames.length)).toEqual([0, 0]);
+      expect(posts.map(isHidden)).toEqual([false, false]);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('should send 0 frames with the poster URL if the page video is tainted, and keep the adapter type gif (TC-028, TC-018)', async () => {

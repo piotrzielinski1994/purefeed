@@ -160,7 +160,7 @@ describe('createVideoSampler (AC-015, AC-020, AC-022)', () => {
     expect(calls).toEqual([]);
   });
 
-  it('should answer the frames read so far if the timeout ends a partial playback', async () => {
+  it('should answer null if the timeout ends a partial playback', async () => {
     const { createVideoSampler } = await loadSampler();
     const { video, play } = await pageVideo(BLOB_URL);
     const { done, onDone } = collect();
@@ -168,8 +168,7 @@ describe('createVideoSampler (AC-015, AC-020, AC-022)', () => {
     await play(0, 5);
     expect(done).toEqual([]);
     await new Promise((resolve) => setTimeout(resolve, 400));
-    expect(done).toHaveLength(1);
-    expect(done[0]?.map((f) => f.tS)).toEqual([1.25, 3.75]);
+    expect(done).toEqual([null]);
   });
 
   it('should stop sampling and never answer after it is disposed', async () => {
