@@ -7,7 +7,8 @@ export default defineConfig({
   test: {
     environment: 'node',
     globalSetup: 'test/global-setup.ts',
-    exclude: [...configDefaults.exclude, 'test/e2e/**', 'dist/**'],
+    include: ['src/**/*.test.ts', 'test/**/*.test.ts'],
+    exclude: [...configDefaults.exclude, 'test/e2e/**', '**/*.perf.test.ts'],
     coverage: {
       provider: 'v8',
       include: COVERED_DIRS.map((dir) => `${dir}/**`),

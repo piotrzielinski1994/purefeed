@@ -6,16 +6,7 @@
     "useIgnoreFile": true
   },
   "files": {
-    "includes": [
-      "**",
-      "!!**/.pzielinski",
-      "!!**/dist",
-      "!!**/coverage",
-      "!!test/assets/generated",
-      "!!**/test-results",
-      "!!**/playwright-report",
-      "!!**/.cache"
-    ]
+    "includes": ["src/**", "test/**", "scripts/**", "*.json", "*.ts", "*.md", "!!test/assets/generated"]
   },
   "formatter": {
     "enabled": true,
