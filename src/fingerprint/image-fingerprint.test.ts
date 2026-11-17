@@ -93,3 +93,21 @@ describe('image fingerprint (AC-008, AC-009, AC-010)', () => {
     expect(fp?.hash.length).toBe(2);
   });
 });
+
+describe('image fingerprint flat-image boundary (AC-009)', () => {
+  const checkerboard = (low: number, high: number) => {
+    const size = 64;
+    const data = Uint8Array.from({ length: size * size }, (_, i) => (((Math.floor(i / size) >> 3) + ((i % size) >> 3)) % 2 === 0 ? low : high));
+    return { width: size, height: size, data };
+  };
+
+  it('should give no fingerprint at grayscale standard deviation 7.5 and a fingerprint at exactly 8', async () => {
+    const { fingerprintImage } = await loadFingerprint();
+    const { stdDev } = await import('./gray.ts');
+    const below = checkerboard(121, 136);
+    const atLimit = checkerboard(120, 136);
+    expect([stdDev(below), stdDev(atLimit)]).toEqual([7.5, 8]);
+    expect(fingerprintImage(below)).toBeNull();
+    expect(fingerprintImage(atLimit)?.kind).toBe('image');
+  });
+});
