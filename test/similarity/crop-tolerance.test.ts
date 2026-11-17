@@ -6,7 +6,6 @@ import { DEFAULT_THRESHOLDS } from '../helpers/fingerprints.ts';
 
 const ASSET_TEST = { timeout: 240_000 };
 const SAMPLE_STRIDE = 14;
-const MIN_MATCH_RATIO = 0.95;
 const BLOCK_WHITE = 250;
 const LOGO = { width: 134, height: 134 };
 const TEXT_BLOCK = { width: 100, height: 60 };
@@ -38,13 +37,13 @@ async function classesOf(a: GrayImage, b: GrayImage): Promise<string[]> {
 }
 
 describe('crops of any shape within the AC-011 limit (AC-011)', () => {
-  it('should match base.png cropped by up to 10% of width and height in >= 95% of a stratified sample of crop shapes', ASSET_TEST, () => {
+  it('should match base.png cropped by up to 10% of width and height in every shape of a stratified sample of crop shapes', ASSET_TEST, () => {
     const base = loadGray('base.png');
     const sample = cropShapes(base).filter((_shape, i) => i % SAMPLE_STRIDE === 0);
     const results = sweepCrops(base, sample);
     const missed = results.filter((r) => !isMatch(r)).map((r) => `${JSON.stringify(r.shape)} ${r.classes.join('/')}`);
     expect(sample.length).toBeGreaterThanOrEqual(99);
-    expect(results.length - missed.length, missed.join('\n')).toBeGreaterThanOrEqual(Math.ceil(MIN_MATCH_RATIO * sample.length));
+    expect(missed).toEqual([]);
   });
 
   it('should return different if a copy with an added logo, block or text is also cropped', ASSET_TEST, async () => {

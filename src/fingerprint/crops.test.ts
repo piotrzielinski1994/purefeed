@@ -10,7 +10,8 @@ const AXIS = [
   [0, 0],
   [0.1, 0],
   [0, 0.1],
-  [0.05, 0.05],
+  [0.05, 0.025],
+  [0.025, 0.05],
 ];
 
 function distance(a: Uint32Array, ai: number, b: Uint32Array, bi: number): number {
@@ -26,11 +27,11 @@ function distance(a: Uint32Array, ai: number, b: Uint32Array, bi: number): numbe
 }
 
 describe('crop variant hashes (AC-011)', () => {
-  it('should list 16 crop variants that combine 4 horizontal and 4 vertical crops', async () => {
+  it('should list 25 crop variants that combine 5 horizontal and 5 vertical crops', async () => {
     const { CROP_VARIANTS } = await loadCrops();
-    expect(CROP_VARIANTS.length).toBe(16);
+    expect(CROP_VARIANTS.length).toBe(25);
     const keys = CROP_VARIANTS.map((r) => `${r.left},${r.right},${r.top},${r.bottom}`);
-    expect(new Set(keys).size).toBe(16);
+    expect(new Set(keys).size).toBe(25);
     for (const [left, right] of AXIS) {
       for (const [top, bottom] of AXIS) expect(keys).toContain(`${left},${right},${top},${bottom}`);
     }
@@ -43,7 +44,7 @@ describe('crop variant hashes (AC-011)', () => {
     const img = loadGray('base-50.png');
     const crops = cropHashes(img);
     expect(crops).toBeInstanceOf(Uint32Array);
-    expect(crops.length).toBe(32);
+    expect(crops.length).toBe(50);
     CROP_VARIANTS.forEach((rect, i) => {
       expect(Array.from(crops.subarray(2 * i, 2 * i + 2)), JSON.stringify(rect)).toEqual(Array.from(pHash64(cropFraction(img, rect))));
     });

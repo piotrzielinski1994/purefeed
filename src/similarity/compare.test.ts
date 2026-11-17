@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { CROP_WORDS } from '../../test/helpers/fingerprints.ts';
 import type { FrameSequenceFingerprint, ImageFingerprint, PosterFingerprint, Thresholds } from '../shared/types.ts';
 
 const loadCompare = () => import('./compare.ts');
@@ -29,11 +30,7 @@ const EDGES = Uint32Array.from(randomHashes(64, 5).flat());
 const BASE: Hash = randomHashes(1, 23)[0];
 
 function imageFp(hash: Hash): ImageFingerprint {
-  const crops = new Uint32Array(32);
-  for (let i = 0; i < 16; i++) {
-    crops[2 * i] = ~hash[0] >>> 0;
-    crops[2 * i + 1] = ~hash[1] >>> 0;
-  }
+  const crops = Uint32Array.from({ length: CROP_WORDS }, (_, i) => ~hash[i % 2] >>> 0);
   return { kind: 'image', hash: Uint32Array.of(...hash), crops, edges: new Uint32Array(EDGES) };
 }
 

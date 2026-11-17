@@ -1,3 +1,4 @@
+import { CROP_VARIANTS } from '../../src/fingerprint/crops.ts';
 import type {
   ContentType,
   FrameSequenceFingerprint,
@@ -34,12 +35,10 @@ export function flip(hash: Hash, bits: number): Hash {
 
 const EDGES = Uint32Array.from(randomHashes(64, 5).flat());
 
+export const CROP_WORDS = 2 * CROP_VARIANTS.length;
+
 export function imageFp(hash: Hash): ImageFingerprint {
-  const crops = new Uint32Array(32);
-  for (let i = 0; i < 16; i++) {
-    crops[2 * i] = ~hash[0] >>> 0;
-    crops[2 * i + 1] = ~hash[1] >>> 0;
-  }
+  const crops = Uint32Array.from({ length: CROP_WORDS }, (_, i) => ~hash[i % 2] >>> 0);
   return { kind: 'image', hash: Uint32Array.of(...hash), crops, edges: new Uint32Array(EDGES) };
 }
 

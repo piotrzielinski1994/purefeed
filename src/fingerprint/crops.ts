@@ -6,7 +6,8 @@ const AXIS_CROPS = [
   [0, 0],
   [0.1, 0],
   [0, 0.1],
-  [0.05, 0.05],
+  [0.05, 0.025],
+  [0.025, 0.05],
 ] as const;
 
 export const CROP_VARIANTS: readonly CropRect[] = AXIS_CROPS.flatMap(([left, right]) =>

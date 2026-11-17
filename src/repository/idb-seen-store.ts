@@ -3,7 +3,7 @@ import type { SeenRecord } from './seen-record.ts';
 import type { SeenEntry, SeenStore } from './seen-store.ts';
 
 const DB_NAME = 'purefeed';
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 const FIRST_VERSION = 1;
 const STORE = 'seen';
 const LAST_SEEN_INDEX = 'lastSeenAt';

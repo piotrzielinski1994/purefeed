@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { loadGray } from '../../test/helpers/assets.ts';
+import { CROP_WORDS } from '../../test/helpers/fingerprints.ts';
 import type { ImageFingerprint } from '../shared/types.ts';
 
 const loadSimilarity = () => import('./image-similarity.ts');
@@ -42,13 +43,13 @@ describe('best image similarity (AC-010, AC-011)', () => {
     const { bestImageSimilarity } = await loadSimilarity();
     const base = await fingerprintAsset('base.png');
     const cropped = await fingerprintAsset('crop-l10-tb5.png');
-    const rect = { left: 0.1, right: 0, top: 0.05, bottom: 0.05 };
+    const horizontal = { left: 0.1, right: 0 };
     const forward = bestImageSimilarity(base, cropped).alignment;
     const backward = bestImageSimilarity(cropped, base).alignment;
     expect(forward.side).toBe('a-cropped');
-    expect(forward.crop).toEqual(rect);
+    expect(forward.crop).toMatchObject(horizontal);
     expect(backward.side).toBe('b-cropped');
-    expect(backward.crop).toEqual(rect);
+    expect(backward.crop).toMatchObject(horizontal);
   });
 
   it('should reach >= 90% if base.png is compared with its copy with a logo on 5% of the area', ASSET_TEST, async () => {
@@ -82,7 +83,7 @@ describe('best image similarity (AC-010, AC-011)', () => {
 
   it('should use the plain hash similarity with no alignment if every crop variant matches worse', async () => {
     const { bestImageSimilarity } = await loadSimilarity();
-    const crops = new Uint32Array(32).fill(0xaaaaaaaa);
+    const crops = new Uint32Array(CROP_WORDS).fill(0xaaaaaaaa);
     const edges = new Uint32Array(128);
     const a: ImageFingerprint = { kind: 'image', hash: Uint32Array.of(0, 0), crops, edges };
     const b: ImageFingerprint = { kind: 'image', hash: Uint32Array.of(0b1111, 0), crops, edges };

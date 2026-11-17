@@ -34,13 +34,13 @@ describe('image fingerprint (AC-008, AC-009, AC-010)', () => {
     expect(MIN_STD_DEV).toBe(8);
   });
 
-  it('should hold a 64-bit hash, 16 crop hashes and a 64 x 64 edge map if a textured image is fingerprinted', ASSET_TEST, async () => {
+  it('should hold a 64-bit hash, 25 crop hashes and a 64 x 64 edge map if a textured image is fingerprinted', ASSET_TEST, async () => {
     const fp = await fingerprintAsset('base.png');
     expect(fp.kind).toBe('image');
     expect(fp.hash).toBeInstanceOf(Uint32Array);
     expect(fp.hash.length).toBe(2);
     expect(fp.crops).toBeInstanceOf(Uint32Array);
-    expect(fp.crops.length).toBe(32);
+    expect(fp.crops.length).toBe(50);
     expect(fp.edges).toBeInstanceOf(Uint32Array);
     expect(fp.edges.length).toBe(128);
   });
