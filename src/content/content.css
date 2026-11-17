@@ -1,0 +1,4 @@
+[data-purefeed-hidden] {
+  /* biome-ignore lint/complexity/noImportantStyles: hidden posts must stay hidden against page CSS */
+  display: none !important;
+}

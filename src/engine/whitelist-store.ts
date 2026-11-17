@@ -7,7 +7,7 @@ export type WhitelistStore = {
   remove(e: WhitelistEntry): Promise<void>;
 };
 
-const WHITELIST_KEY = 'whitelist';
+export const WHITELIST_KEY = 'whitelist';
 
 const isSameEntry = (a: WhitelistEntry, b: WhitelistEntry): boolean => a.type === b.type && a.key === b.key;
 

@@ -117,6 +117,7 @@ export const settle = async (turns = 20): Promise<void> => {
 export type FakeClock = {
   now(): number;
   setTimer(fn: () => void, ms: number): number;
+  clearTimer(id: unknown): void;
   advance(ms: number): Promise<void>;
   set(ms: number): void;
 };
@@ -131,6 +132,10 @@ export function createFakeClock(start = Date.UTC(2026, 10, 17, 12)): FakeClock {
       seq++;
       timers.push({ at: t + Math.max(0, ms), seq, fn });
       return seq;
+    },
+    clearTimer(id) {
+      const index = timers.findIndex((timer) => timer.seq === id);
+      if (index >= 0) timers.splice(index, 1);
     },
     async advance(ms) {
       const target = t + ms;
