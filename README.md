@@ -2,4 +2,4 @@
 
 ## Limitations
 
-- Video network transfer: fingerprinting 8 frames of a video can transfer more than 25% of the file, and with repeated range requests more than the whole file. Each frame needs the bytes from the keyframe before it, and Chrome reads open-ended byte ranges. Measured on the 10 MB E2E (end-to-end) fixture `big.mp4` (4 Mbit/s, keyframe every 2.5 s): 14.2 MB to 16.8 MB (142% to 169% of the file).
+- Video frames come only from the page's own playback: the extension never downloads video bytes. A video gets a frame sequence fingerprint only after the page plays it (Reddit and X autoplay muted videos in the feed). Before playback, and for a cross-origin video without pixel access (for example an X GIF video on `video.twimg.com`), the video has a poster-only fingerprint, which matches only another poster-only fingerprint and only at `exact`.

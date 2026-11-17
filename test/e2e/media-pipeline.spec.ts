@@ -1,9 +1,7 @@
-import { statSync } from 'node:fs';
 import type { BrowserContext } from '@playwright/test';
 import type { DecodeRequest, DecodeResult, Fingerprint } from '../../src/shared/types.ts';
 import { decodeDecodeResult, encodeSighting, type WireDecodeResult } from '../../src/shared/wire.ts';
 import { compareFingerprints } from '../../src/similarity/compare.ts';
-import { assetPath } from '../helpers/assets.ts';
 import { DEFAULT_THRESHOLDS } from '../helpers/fingerprints.ts';
 import { expect, type SendRequest, stopServiceWorkers, extensionTest as test } from './extension.ts';
 import type { RequestLogEntry } from './server.ts';
@@ -118,23 +116,19 @@ test.describe('media pipeline in Chromium (AC-002, AC-007, AC-008, AC-012, AC-01
     expect(server.log.filter((e) => e.host === 'media2.test')).toEqual([]);
   });
 
-  test('should fingerprint 8 frames of a 10 MB video with an extension transfer of at most 25% of the file (TC-019, TC-027)', async ({
+  test('should give a 10 MB video a poster-only fingerprint with 0 bytes of the video file sent to the extension (TC-027)', async ({
     send,
     server,
   }) => {
-    test.setTimeout(VIDEO_TIMEOUT_MS * 2);
-    const fileBytes = statSync(assetPath('big.mp4')).size;
-    const result = await fingerprint(
-      send,
-      { url: 'https://video.twimg.com/ext_tw_video/1/pu/vid/1280x720/big.mp4?tag=12', contentType: 'video', posterUrl: null },
-      VIDEO_TIMEOUT_MS,
-    );
-    expect(result).toMatchObject({ status: 'ok', contentType: 'video', fingerprint: { kind: 'sequence' } });
-    const timestamps = Array.from((okFingerprint(result) as Extract<Fingerprint, { kind: 'sequence' }>).timestamps);
-    expect(new Set(timestamps).size).toBe(8);
+    const result = await fingerprint(send, {
+      url: 'https://video.twimg.com/ext_tw_video/1/pu/vid/1280x720/big.mp4?tag=12',
+      contentType: 'video',
+      posterUrl: 'https://pbs.twimg.com/ext_tw_video_thumb/1/pu/img/base.png?tc=027',
+    });
+    expect(result).toMatchObject({ status: 'ok', contentType: 'video', fingerprint: { kind: 'poster' } });
     const videoRequests = server.log.filter((e) => e.path.split('?')[0].endsWith('/big.mp4'));
-    expect(videoRequests.length).toBeGreaterThan(0);
-    expect(videoRequests.reduce((sum, e) => sum + e.bytesSent, 0)).toBeLessThanOrEqual(fileBytes * 0.25);
+    expect(videoRequests.reduce((sum, e) => sum + e.bytesSent, 0)).toBe(0);
+    expect(extensionRequests(server.log).map((e) => e.path)).toEqual(['/ext_tw_video_thumb/1/pu/img/base.png?tc=027']);
   });
 
   test('should give a poster-only fingerprint if a cross-origin video has no pixel access and has a poster (TC-028)', async ({ send }) => {
@@ -159,16 +153,10 @@ test.describe('media pipeline in Chromium (AC-002, AC-007, AC-008, AC-012, AC-01
     ).toBe('exact');
   });
 
-  test('should skip a video with no readable frame within 10 s and no poster (TC-029)', async ({ send }) => {
-    test.setTimeout(VIDEO_TIMEOUT_MS * 2);
-    const started = Date.now();
-    const result = await fingerprint(
-      send,
-      { url: 'https://video.twimg.com/stall/clip.mp4?tc=029', contentType: 'video', posterUrl: null },
-      VIDEO_TIMEOUT_MS,
-    );
+  test('should skip a video without a poster at once and send no request for it (TC-029)', async ({ send, server }) => {
+    const result = await fingerprint(send, { url: 'https://video.twimg.com/stall/clip.mp4?tc=029', contentType: 'video', posterUrl: null });
     expect(result).toEqual({ status: 'skipped', reason: 'no-poster' });
-    expect(Date.now() - started).toBeGreaterThanOrEqual(9_500);
+    expect(server.log.filter((e) => e.path.startsWith('/stall/'))).toEqual([]);
   });
 
   test('should still match a stored record if the service worker is stopped and restarted (TC-007)', async ({
