@@ -100,6 +100,10 @@ describe('match class regression on generated assets (AC-010, AC-011, AC-023)', 
     expect(await classify('base.png', 'logo5.png')).toEqual(['different', 'different']);
   });
 
+  it('should return near if base.png is compared with its copy cropped 7% from the right', ASSET_TEST, async () => {
+    expect(await classify('base.png', 'crop-r7.png')).toEqual(['near', 'near']);
+  });
+
   it('should return different if unrelated control images are compared with base.png or with each other', ASSET_TEST, async () => {
     const names = ['base.png', 'other-1.png', 'other-2.png', 'other-3.png'];
     for (let i = 0; i < names.length; i++) {

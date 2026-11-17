@@ -192,6 +192,13 @@ describe('synthetic test assets (AC-080)', () => {
     }
   });
 
+  it('should crop 7% from the right if crop-r7.png is decoded', SLOW, async () => {
+    const { loadGray } = await assets();
+    const cropped = loadGray('crop-r7.png');
+    expect([cropped.width, cropped.height]).toEqual([558, 600]);
+    expect(meanAbsDiff(region(loadGray('base.png'), 0, 0, 558, 600), cropped)).toBeLessThan(2);
+  });
+
   it('should crop 10% from the left and 5% from top and bottom if crop-l10-tb5.png is decoded', SLOW, async () => {
     const { loadGray } = await assets();
     const cropped = loadGray('crop-l10-tb5.png');

@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
+import { loadGray } from '../../test/helpers/assets.ts';
 import { DAY_MS } from '../../test/helpers/fingerprints.ts';
+import { fingerprintImage } from '../fingerprint/image-fingerprint.ts';
+import { SeenIndex } from '../repository/seen-index.ts';
 import { DEFAULT_SETTINGS } from '../shared/settings.ts';
 import type { ContentType, Platform, SeenMatch, Settings } from '../shared/types.ts';
 import type { ItemEvidence, SessionEvidence } from './post-decision.ts';
@@ -94,6 +97,45 @@ describe('decidePost mode (AC-026)', () => {
   it('should keep a post with near session evidence visible if mode is exact only', async () => {
     const decision = await decide({ settings: EXACT_ONLY, items: [item('image', { session: session('near') })] });
     expect(decision).toEqual({ hide: false, reason: 'unique' });
+  });
+});
+
+describe('decidePost mode on generated assets (AC-026, TC-036, TC-037)', () => {
+  const SEEN_POST = { firstSeenPostKey: 'wykop:entry:5', firstSeenPermalink: 'https://wykop.pl/wpis/5', firstSeenAt: NOW - DAY_MS };
+
+  async function hiddenCopies(settings: Settings): Promise<Record<string, boolean>> {
+    const fingerprintOf = (name: string) => {
+      const fp = fingerprintImage(loadGray(name));
+      if (!fp) throw new Error(`${name}: no fingerprint`);
+      return fp;
+    };
+    const index = new SeenIndex();
+    index.upsert('rec-a', {
+      ...SEEN_POST,
+      fingerprint: fingerprintOf('base.png'),
+      contentType: 'image',
+      platform: 'wykop',
+      lastSeenAt: NOW,
+      seenCount: 1,
+    });
+    const thresholds = { exact: settings.exactThreshold, near: settings.nearThreshold };
+    const decisions = await Promise.all(
+      ['base-50.png', 'crop-r7.png'].map(async (name) => {
+        const match = index.findBest(fingerprintOf(name), thresholds);
+        const matchClass = match?.comparison.matchClass;
+        const evidence = matchClass === 'exact' || matchClass === 'near' ? seen(matchClass, { ...SEEN_POST, platform: 'wykop' }) : null;
+        return [name, (await decide({ settings, items: [item('image', { seen: evidence })] })).hide] as const;
+      }),
+    );
+    return Object.fromEntries(decisions);
+  }
+
+  it('should hide only the resized copy if mode is exact only and the cropped copy is near (TC-036)', async () => {
+    expect(await hiddenCopies(EXACT_ONLY)).toEqual({ 'base-50.png': true, 'crop-r7.png': false });
+  });
+
+  it('should hide the resized and the cropped copy if mode is exact and near (TC-037)', async () => {
+    expect(await hiddenCopies(DEFAULT_SETTINGS)).toEqual({ 'base-50.png': true, 'crop-r7.png': true });
   });
 });
 

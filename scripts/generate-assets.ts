@@ -24,7 +24,7 @@ import {
   toPng,
 } from './lib/raster.ts';
 
-export const GENERATOR_VERSION = 1;
+export const GENERATOR_VERSION = 2;
 export const GENERATED_DIR = join(import.meta.dirname, '..', 'test', 'assets', 'generated');
 export const FRAME_FPS = 10;
 export const FRAME_SIZE = 96;
@@ -43,6 +43,7 @@ export const IMAGE_ASSETS = [
   'base.bmp',
   'base-static.gif',
   'crop-l10-tb5.png',
+  'crop-r7.png',
   'logo5.png',
   'caption-a.png',
   'caption-b.png',
@@ -88,6 +89,7 @@ const CAPTION_SCALE = 6;
 const SCREENSHOT_SCALE = 2;
 const LOGO_SIZE = 134;
 const CROP = { left: 60, top: 30, size: 540 };
+const NEAR_CROP_WIDTH = 558;
 const JPEG_QSCALE = { 'base-q30.jpg': 24, 'base-q60.jpg': 11, 'base-q95.jpg': 2 } as const;
 const H264_BASE = ['-c:v', 'libx264', '-preset', 'medium', '-pix_fmt', 'yuv420p', '-movflags', '+faststart'];
 const H264 = [...H264_BASE, '-crf', '23'];
@@ -186,6 +188,7 @@ const SCREENSHOT_2 = [
 const IMAGE_PAINTS: Array<[string, number, number, Paint]> = [
   ['base.png', IMAGE_SIZE, IMAGE_SIZE, basePicture],
   ['crop-l10-tb5.png', CROP.size, CROP.size, (x, y) => basePicture(x + CROP.left, y + CROP.top)],
+  ['crop-r7.png', NEAR_CROP_WIDTH, IMAGE_SIZE, basePicture],
   [
     'logo5.png',
     IMAGE_SIZE,
