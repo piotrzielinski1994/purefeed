@@ -3,7 +3,7 @@ import type { Platform } from '../../src/shared/types.ts';
 import { expect, extensionTest as test } from './extension.ts';
 import { FEED_URL, generateFeed, scrollFeed, serveHtml } from './feed-generator.ts';
 
-type TraceEvent = { name: string; ph: string; ts: number; dur?: number; args?: { data?: { url?: string } } };
+type TraceEvent = { name: string; ph: string; ts: number; dur?: number; pid?: number; tid?: number; args?: { data?: { url?: string } } };
 
 const LONG_TASK_MS = 50;
 const STARTUP_BUDGET_MS = 15;
@@ -15,6 +15,22 @@ function extensionTaskDurations(trace: TraceEvent[], extensionId: string): numbe
   return trace
     .filter((e) => e.ph === 'X' && typeof e.dur === 'number' && (e.args?.data?.url ?? '').startsWith(prefix))
     .map((e) => (e.dur as number) / 1000);
+}
+
+const msOf = (e: TraceEvent): number => (e.dur ?? 0) / 1000;
+
+function contentStartup(trace: TraceEvent[], extensionId: string): { evaluateMs: number; startMicrotasksMs: number[] } {
+  const prefix = `chrome-extension://${extensionId}/`;
+  const evaluate = trace.find((e) => e.name === 'EvaluateScript' && e.ph === 'X' && e.args?.data?.url === `${prefix}content.js`);
+  if (!evaluate) throw new Error('no EvaluateScript event of content.js in the trace');
+  const evaluatedAt = evaluate.ts + (evaluate.dur ?? 0);
+  const mainThread = trace.filter((e) => e.ph === 'X' && e.pid === evaluate.pid && e.tid === evaluate.tid && e.ts >= evaluatedAt);
+  const firstCallback = mainThread
+    .filter((e) => e.name === 'FunctionCall' && (e.args?.data?.url ?? '').startsWith(prefix))
+    .reduce<TraceEvent | null>((first, e) => (first === null || e.ts < first.ts ? e : first), null);
+  if (!firstCallback) throw new Error('no extension callback after content.js evaluation');
+  const startMicrotasksMs = mainThread.filter((e) => e.name === 'RunMicrotasks' && e.ts + (e.dur ?? 0) <= firstCallback.ts).map(msOf);
+  return { evaluateMs: msOf(evaluate), startMicrotasksMs };
 }
 
 async function traced<T>(context: BrowserContext, page: Page, run: () => Promise<T>): Promise<{ result: T; trace: TraceEvent[] }> {
@@ -110,6 +126,20 @@ test.describe('performance on 300-post fixture feeds (AC-074, AC-075, AC-077)', 
       [requested, LOOKAHEAD_VIEWPORTS] as const,
     );
     expect(below).toEqual([]);
+  });
+
+  test('should spend <= 15 ms main-thread time from content script evaluation through runtime start after the storage reads (TC-097)', async ({
+    context,
+    extensionId,
+  }) => {
+    const page = await openGeneratedFeed(context, 'reddit', 'tc097-start');
+    const { trace } = await traced(context, page, async () => {
+      await page.goto(FEED_URL.reddit('tc097-start'));
+      await page.waitForTimeout(3_000);
+    });
+    const { evaluateMs, startMicrotasksMs } = contentStartup(trace, extensionId);
+    expect(startMicrotasksMs.length).toBeGreaterThan(0);
+    expect(evaluateMs + startMicrotasksMs.reduce((a, b) => a + b, 0)).toBeLessThanOrEqual(STARTUP_BUDGET_MS);
   });
 
   for (const platform of ['reddit', 'wykop', 'x'] as const) {
