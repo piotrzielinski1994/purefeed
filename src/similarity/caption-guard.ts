@@ -16,7 +16,7 @@ const FINE_STEPS_PER_SIDE = 128;
 const COARSE_FACTOR = 4;
 const MAX_CROP_FRACTION = 0.11;
 const MAX_CROP_STEPS = Math.floor(MAX_CROP_FRACTION * FINE_STEPS_PER_SIDE);
-const SEARCH_SAMPLES = 32;
+const SEARCH_SAMPLES = EDGE_GRID;
 const SEARCH_ROUNDS = 3;
 const IMPROVEMENT = 1e-6;
 const FULL: Span = { a0: 0, a1: 1, b0: 0, b1: 1 };
@@ -48,11 +48,17 @@ const positions = (from: number, to: number, samples: number): Float32Array =>
 
 const clampCell = (p: number): number => Math.min(EDGE_GRID - 1, Math.max(0, p));
 
-function lerpAt(values: Float32Array, offset: number, p: number): number {
-  const c = clampCell(p);
-  const i0 = Math.floor(c);
-  const f = c - i0;
-  return values[offset + i0] * (1 - f) + values[offset + Math.min(EDGE_GRID - 1, i0 + 1)] * f;
+type Taps = { i0: Int32Array; i1: Int32Array; f: Float64Array };
+
+function tapsOf(p: Float32Array): Taps {
+  const taps = { i0: new Int32Array(p.length), i1: new Int32Array(p.length), f: new Float64Array(p.length) };
+  for (let s = 0; s < p.length; s++) {
+    const c = clampCell(p[s]);
+    taps.i0[s] = Math.floor(c);
+    taps.i1[s] = Math.min(EDGE_GRID - 1, taps.i0[s] + 1);
+    taps.f[s] = c - taps.i0[s];
+  }
+  return taps;
 }
 
 function crossLines(map: Float32Array, across: Float32Array, axis: keyof Steps): Float32Array {
@@ -70,12 +76,14 @@ function crossLines(map: Float32Array, across: Float32Array, axis: keyof Steps):
 }
 
 function lineMisfit(linesA: Float32Array, linesB: Float32Array, span: Span): number {
-  const pa = positions(span.a0, span.a1, SEARCH_SAMPLES);
-  const pb = positions(span.b0, span.b1, SEARCH_SAMPLES);
+  const a = tapsOf(positions(span.a0, span.a1, SEARCH_SAMPLES));
+  const b = tapsOf(positions(span.b0, span.b1, SEARCH_SAMPLES));
   let total = 0;
-  for (let k = 0; k < SEARCH_SAMPLES; k++) {
+  for (let k = 0; k < SEARCH_SAMPLES * EDGE_GRID; k += EDGE_GRID) {
     for (let s = 0; s < SEARCH_SAMPLES; s++) {
-      total += Math.abs(lerpAt(linesA, k * EDGE_GRID, pa[s]) - lerpAt(linesB, k * EDGE_GRID, pb[s]));
+      const va = linesA[k + a.i0[s]] * (1 - a.f[s]) + linesA[k + a.i1[s]] * a.f[s];
+      const vb = linesB[k + b.i0[s]] * (1 - b.f[s]) + linesB[k + b.i1[s]] * b.f[s];
+      total += Math.abs(va - vb);
     }
   }
   return total;

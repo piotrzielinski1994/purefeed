@@ -15,6 +15,12 @@ const OVERLAY_CROPS: CropShape[] = [
   { left: 18, right: 18, top: 12, bottom: 24 },
   { left: 24, right: 24, top: 24, bottom: 24 },
 ];
+const NEAREST_TO_LIMIT: CropShape[] = [
+  { left: 0, right: 6, top: 60, bottom: 0 },
+  { left: 48, right: 6, top: 60, bottom: 0 },
+  { left: 30, right: 12, top: 12, bottom: 24 },
+  { left: 0, right: 18, top: 12, bottom: 36 },
+];
 
 type Block = { x: number; y: number; width: number; height: number };
 
@@ -44,6 +50,12 @@ describe('crops of any shape within the AC-011 limit (AC-011)', () => {
     const missed = results.filter((r) => !isMatch(r)).map((r) => `${JSON.stringify(r.shape)} ${r.classes.join('/')}`);
     expect(sample.length).toBeGreaterThanOrEqual(99);
     expect(missed).toEqual([]);
+  });
+
+  it('should match base.png cropped in the shapes nearest to the caption guard limit', ASSET_TEST, () => {
+    const base = loadGray('base.png');
+    const results = sweepCrops(base, NEAREST_TO_LIMIT);
+    expect(results.map((r) => [r.shape, r.classes.every((c) => c !== 'different')])).toEqual(NEAREST_TO_LIMIT.map((shape) => [shape, true]));
   });
 
   it('should return different if a copy with an added logo, block or text is also cropped', ASSET_TEST, async () => {
