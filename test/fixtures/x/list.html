@@ -1,0 +1,87 @@
+<!-- biome-ignore-all lint/a11y: mirrors third-party platform markup -->
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Fixture: X list timeline</title>
+  </head>
+  <body>
+    <!-- Not confirmed live: x.com needs a login. Same tweet markup as home.html (article[data-testid="tweet"], User-Name status link with time, tweetPhoto, videoPlayer); page chrome after the documented list layout. Synthetic text, ids and media. -->
+    <div id="react-root">
+      <main role="main">
+        <div data-testid="primaryColumn">
+          <div data-testid="listHeader">
+            <a href="/i/lists/1860000000000009200/info" role="link"><img alt="" src="https://pbs.twimg.com/list_banner_img/1860000000000009200/pf-list?format=jpg&amp;name=600x200" style="width: 600px; height: 200px" /></a>
+            <span>Synthetic list</span>
+          </div>
+          <section role="region" aria-labelledby="accessible-list-0">
+            <div aria-label="Timeline: List">
+              <div style="position: relative; min-height: 2400px">
+                <div data-testid="cellInnerDiv" style="transform: translateY(0px); position: absolute; width: 100%">
+                  <div class="css-175oi2r">
+                    <article aria-labelledby="id__l1" role="article" tabindex="0" class="css-175oi2r" data-testid="tweet">
+                      <div class="css-175oi2r">
+                        <div data-testid="Tweet-User-Avatar">
+                          <div data-testid="UserAvatar-Container-pf_member_a">
+                            <a href="/pf_member_a" role="link"><img alt="" draggable="true" src="https://pbs.twimg.com/profile_images/9/pf_member_a_normal.jpg" style="width: 40px; height: 40px" /></a>
+                          </div>
+                        </div>
+                        <div data-testid="User-Name">
+                          <div><a href="/pf_member_a" role="link"><span>Synthetic Member A</span></a></div>
+                          <div>
+                            <a href="/pf_member_a" role="link" tabindex="-1"><span>@pf_member_a</span></a>
+                            <span>·</span>
+                            <a href="/pf_member_a/status/1860000000000009201" dir="ltr" aria-label="Nov 17" role="link"><time datetime="2026-11-17T10:00:00.000Z">Nov 17</time></a>
+                          </div>
+                        </div>
+                        <div data-testid="tweetText" lang="en"><span>Synthetic list video</span></div>
+                        <div aria-labelledby="id__l1_media">
+                          <div data-testid="videoPlayer">
+                            <div data-testid="videoComponent">
+                              <video aria-label="Embedded video" muted="" playsinline="" poster="https://pbs.twimg.com/ext_tw_video_thumb/PfListVid/pu/img/PfListVid.jpg" preload="none" src="blob:https://x.com/PfListVid-0000-4000-8000-000000000001" style="width: 506px; height: 285px"></video>
+                            </div>
+                          </div>
+                        </div>
+                        <div role="group" aria-label="0 replies, 0 reposts, 0 likes"></div>
+                      </div>
+                    </article>
+                  </div>
+                </div>
+                <div data-testid="cellInnerDiv" style="transform: translateY(600px); position: absolute; width: 100%">
+                  <div class="css-175oi2r">
+                    <article aria-labelledby="id__l2" role="article" tabindex="0" class="css-175oi2r" data-testid="tweet">
+                      <div class="css-175oi2r">
+                        <div data-testid="Tweet-User-Avatar">
+                          <div data-testid="UserAvatar-Container-pf_member_b">
+                            <a href="/pf_member_b" role="link"><img alt="" draggable="true" src="https://pbs.twimg.com/profile_images/9/pf_member_b_normal.jpg" style="width: 40px; height: 40px" /></a>
+                          </div>
+                        </div>
+                        <div data-testid="User-Name">
+                          <div><a href="/pf_member_b" role="link"><span>Synthetic Member B</span></a></div>
+                          <div>
+                            <a href="/pf_member_b" role="link" tabindex="-1"><span>@pf_member_b</span></a>
+                            <span>·</span>
+                            <a href="/pf_member_b/status/1860000000000009202" dir="ltr" aria-label="Nov 17" role="link"><time datetime="2026-11-17T10:00:00.000Z">Nov 17</time></a>
+                          </div>
+                        </div>
+                        <div data-testid="tweetText" lang="en"><span>Synthetic list photo</span></div>
+                        <div aria-labelledby="id__l2_media">
+                          <a href="/pf_member_b/status/1860000000000009202/photo/1" role="link">
+                            <div aria-label="Image" data-testid="tweetPhoto">
+                              <img alt="" draggable="true" src="https://pbs.twimg.com/media/PfListB?format=jpg&amp;name=small" srcset="https://pbs.twimg.com/media/PfListB?format=jpg&amp;name=large 2x" style="width: 506px; height: 380px" />
+                            </div>
+                          </a>
+                        </div>
+                        <div role="group" aria-label="0 replies, 0 reposts, 0 likes"></div>
+                      </div>
+                    </article>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+        </div>
+      </main>
+    </div>
+  </body>
+</html>

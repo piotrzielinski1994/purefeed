@@ -194,3 +194,59 @@ describe('X adapter status page (AC-031, AC-044, spec 1.1)', () => {
     expect(posts[0].media.map((m) => m.el.getAttribute('src'))).toEqual(['https://pbs.twimg.com/media/PfPhotoA?format=jpg&name=medium']);
   });
 });
+
+describe('X adapter search, list and profile timelines (AC-044)', () => {
+  const TIMELINES = [
+    {
+      view: 'search',
+      url: 'https://x.com/search?q=pf&src=typed_query',
+      fixture: 'x/search.html',
+      tweets: [
+        { status: '1860000000000009101', handle: 'pf_seeker', media: 'image' },
+        { status: '1860000000000009102', handle: 'pf_finder', media: 'gif' },
+      ],
+    },
+    {
+      view: 'list',
+      url: 'https://x.com/i/lists/1860000000000009200',
+      fixture: 'x/list.html',
+      tweets: [
+        { status: '1860000000000009201', handle: 'pf_member_a', media: 'video' },
+        { status: '1860000000000009202', handle: 'pf_member_b', media: 'image' },
+      ],
+    },
+    {
+      view: 'profile',
+      url: 'https://x.com/pf_owner',
+      fixture: 'x/profile.html',
+      tweets: [
+        { status: '1860000000000009301', handle: 'pf_owner', media: 'image' },
+        { status: '1860000000000009302', handle: 'pf_original', media: 'gif' },
+      ],
+    },
+  ];
+  for (const timeline of TIMELINES) {
+    it(`should read each ${timeline.view} timeline tweet as one post with key x:<statusId>, source key x:@<handle> and its media type`, async () => {
+      setUrl(timeline.url);
+      const adapter = await loadAdapter();
+      loadFixture(document, timeline.fixture);
+      const posts = readAll(adapter);
+      expect(
+        posts.map((p) => ({ key: p.postKey, sources: p.sourceKeys, permalink: p.permalink, types: p.media.map((m) => m.contentType) })),
+      ).toEqual(
+        timeline.tweets.map((t) => ({
+          key: `x:${t.status}`,
+          sources: [`x:@${t.handle}`],
+          permalink: `https://x.com/${t.handle}/status/${t.status}`,
+          types: [t.media],
+        })),
+      );
+      const postMedia = new Set(posts.flatMap((p) => p.media.map((m) => m.el)));
+      expect(
+        [...document.querySelectorAll('img, video')].filter((el) => postMedia.has(el as HTMLImageElement) && !el.closest('article')),
+      ).toEqual([]);
+      expect(postMedia.size).toBe(2);
+      expect(adapter.focalPostKey(new URL(timeline.url))).toBeNull();
+    });
+  }
+});

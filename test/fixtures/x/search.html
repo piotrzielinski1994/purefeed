@@ -1,0 +1,88 @@
+<!-- biome-ignore-all lint/a11y: mirrors third-party platform markup -->
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Fixture: X search timeline</title>
+  </head>
+  <body>
+    <!-- Not confirmed live: x.com needs a login. Same tweet markup as home.html (article[data-testid="tweet"], User-Name status link with time, tweetPhoto, videoPlayer); page chrome after the documented search layout. Synthetic text, ids and media. -->
+    <div id="react-root">
+      <main role="main">
+        <div data-testid="primaryColumn">
+          <div data-testid="UserCell">
+            <a href="/pf_searchuser" role="link"><img alt="" src="https://pbs.twimg.com/profile_images/9/pf_searchuser_400x400.jpg" style="width: 200px; height: 200px" /></a>
+            <span>Synthetic search user</span>
+          </div>
+          <section role="region" aria-labelledby="accessible-list-0">
+            <div aria-label="Timeline: Search timeline">
+              <div style="position: relative; min-height: 2400px">
+                <div data-testid="cellInnerDiv" style="transform: translateY(0px); position: absolute; width: 100%">
+                  <div class="css-175oi2r">
+                    <article aria-labelledby="id__s1" role="article" tabindex="0" class="css-175oi2r" data-testid="tweet">
+                      <div class="css-175oi2r">
+                        <div data-testid="Tweet-User-Avatar">
+                          <div data-testid="UserAvatar-Container-pf_seeker">
+                            <a href="/pf_seeker" role="link"><img alt="" draggable="true" src="https://pbs.twimg.com/profile_images/9/pf_seeker_normal.jpg" style="width: 40px; height: 40px" /></a>
+                          </div>
+                        </div>
+                        <div data-testid="User-Name">
+                          <div><a href="/pf_seeker" role="link"><span>Synthetic Seeker</span></a></div>
+                          <div>
+                            <a href="/pf_seeker" role="link" tabindex="-1"><span>@pf_seeker</span></a>
+                            <span>·</span>
+                            <a href="/pf_seeker/status/1860000000000009101" dir="ltr" aria-label="Nov 17" role="link"><time datetime="2026-11-17T10:00:00.000Z">Nov 17</time></a>
+                          </div>
+                        </div>
+                        <div data-testid="tweetText" lang="en"><span>Synthetic search photo</span></div>
+                        <div aria-labelledby="id__s1_media">
+                          <a href="/pf_seeker/status/1860000000000009101/photo/1" role="link">
+                            <div aria-label="Image" data-testid="tweetPhoto">
+                              <img alt="" draggable="true" src="https://pbs.twimg.com/media/PfSearchA?format=jpg&amp;name=small" srcset="https://pbs.twimg.com/media/PfSearchA?format=jpg&amp;name=large 2x" style="width: 506px; height: 380px" />
+                            </div>
+                          </a>
+                        </div>
+                        <div role="group" aria-label="0 replies, 0 reposts, 0 likes"></div>
+                      </div>
+                    </article>
+                  </div>
+                </div>
+                <div data-testid="cellInnerDiv" style="transform: translateY(600px); position: absolute; width: 100%">
+                  <div class="css-175oi2r">
+                    <article aria-labelledby="id__s2" role="article" tabindex="0" class="css-175oi2r" data-testid="tweet">
+                      <div class="css-175oi2r">
+                        <div data-testid="Tweet-User-Avatar">
+                          <div data-testid="UserAvatar-Container-pf_finder">
+                            <a href="/pf_finder" role="link"><img alt="" draggable="true" src="https://pbs.twimg.com/profile_images/9/pf_finder_normal.jpg" style="width: 40px; height: 40px" /></a>
+                          </div>
+                        </div>
+                        <div data-testid="User-Name">
+                          <div><a href="/pf_finder" role="link"><span>Synthetic Finder</span></a></div>
+                          <div>
+                            <a href="/pf_finder" role="link" tabindex="-1"><span>@pf_finder</span></a>
+                            <span>·</span>
+                            <a href="/pf_finder/status/1860000000000009102" dir="ltr" aria-label="Nov 17" role="link"><time datetime="2026-11-17T10:00:00.000Z">Nov 17</time></a>
+                          </div>
+                        </div>
+                        <div data-testid="tweetText" lang="en"><span>Synthetic search GIF</span></div>
+                        <div aria-labelledby="id__s2_media">
+                          <div data-testid="videoPlayer">
+                            <div data-testid="videoComponent">
+                              <video aria-label="Embedded video" autoplay="" loop="" muted="" playsinline="" poster="https://pbs.twimg.com/tweet_video_thumb/PfSearchGif.jpg" preload="auto" src="https://video.twimg.com/tweet_video/PfSearchGif.mp4" type="video/mp4" style="width: 506px; height: 380px"></video>
+                            </div>
+                            <div><div><span>GIF</span></div></div>
+                          </div>
+                        </div>
+                        <div role="group" aria-label="0 replies, 0 reposts, 0 likes"></div>
+                      </div>
+                    </article>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+        </div>
+      </main>
+    </div>
+  </body>
+</html>

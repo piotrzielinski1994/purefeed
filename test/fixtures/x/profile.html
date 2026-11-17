@@ -1,0 +1,93 @@
+<!-- biome-ignore-all lint/a11y: mirrors third-party platform markup -->
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Fixture: X profile timeline</title>
+  </head>
+  <body>
+    <!-- Not confirmed live: x.com needs a login. Same tweet markup as home.html (article[data-testid="tweet"], User-Name status link with time, tweetPhoto, videoPlayer); page chrome after the documented profile layout. Synthetic text, ids and media. -->
+    <div id="react-root">
+      <main role="main">
+        <div data-testid="primaryColumn">
+          <div data-testid="UserProfileHeader_Items">
+            <a href="/pf_owner/header_photo" role="link"><img alt="" src="https://pbs.twimg.com/profile_banners/1860000000000009300/1700000000/600x200" style="width: 600px; height: 200px" /></a>
+            <div data-testid="UserAvatar-Container-pf_owner">
+              <a href="/pf_owner/photo" role="link"><img alt="Opens profile photo" src="https://pbs.twimg.com/profile_images/9/pf_owner_400x400.jpg" style="width: 133px; height: 133px" /></a>
+            </div>
+            <div data-testid="UserName"><span>Synthetic Owner</span><span>@pf_owner</span></div>
+          </div>
+          <section role="region" aria-labelledby="accessible-list-0">
+            <div aria-label="Timeline: Synthetic Owner’s posts">
+              <div style="position: relative; min-height: 2400px">
+                <div data-testid="cellInnerDiv" style="transform: translateY(0px); position: absolute; width: 100%">
+                  <div class="css-175oi2r">
+                    <article aria-labelledby="id__p1" role="article" tabindex="0" class="css-175oi2r" data-testid="tweet">
+                      <div class="css-175oi2r">
+                        <div data-testid="socialContext"><span>Pinned</span></div>
+                        <div data-testid="Tweet-User-Avatar">
+                          <div data-testid="UserAvatar-Container-pf_owner">
+                            <a href="/pf_owner" role="link"><img alt="" draggable="true" src="https://pbs.twimg.com/profile_images/9/pf_owner_normal.jpg" style="width: 40px; height: 40px" /></a>
+                          </div>
+                        </div>
+                        <div data-testid="User-Name">
+                          <div><a href="/pf_owner" role="link"><span>Synthetic Owner</span></a></div>
+                          <div>
+                            <a href="/pf_owner" role="link" tabindex="-1"><span>@pf_owner</span></a>
+                            <span>·</span>
+                            <a href="/pf_owner/status/1860000000000009301" dir="ltr" aria-label="Nov 17" role="link"><time datetime="2026-11-17T10:00:00.000Z">Nov 17</time></a>
+                          </div>
+                        </div>
+                        <div data-testid="tweetText" lang="en"><span>Synthetic pinned photo</span></div>
+                        <div aria-labelledby="id__p1_media">
+                          <a href="/pf_owner/status/1860000000000009301/photo/1" role="link">
+                            <div aria-label="Image" data-testid="tweetPhoto">
+                              <img alt="" draggable="true" src="https://pbs.twimg.com/media/PfPinned?format=jpg&amp;name=small" srcset="https://pbs.twimg.com/media/PfPinned?format=jpg&amp;name=large 2x" style="width: 506px; height: 380px" />
+                            </div>
+                          </a>
+                        </div>
+                        <div role="group" aria-label="0 replies, 0 reposts, 0 likes"></div>
+                      </div>
+                    </article>
+                  </div>
+                </div>
+                <div data-testid="cellInnerDiv" style="transform: translateY(600px); position: absolute; width: 100%">
+                  <div class="css-175oi2r">
+                    <article aria-labelledby="id__p2" role="article" tabindex="0" class="css-175oi2r" data-testid="tweet">
+                      <div class="css-175oi2r">
+                        <a href="/pf_owner" role="link" data-testid="socialContext"><span>Synthetic Owner reposted</span></a>
+                        <div data-testid="Tweet-User-Avatar">
+                          <div data-testid="UserAvatar-Container-pf_original">
+                            <a href="/pf_original" role="link"><img alt="" draggable="true" src="https://pbs.twimg.com/profile_images/9/pf_original_normal.jpg" style="width: 40px; height: 40px" /></a>
+                          </div>
+                        </div>
+                        <div data-testid="User-Name">
+                          <div><a href="/pf_original" role="link"><span>Synthetic Original</span></a></div>
+                          <div>
+                            <a href="/pf_original" role="link" tabindex="-1"><span>@pf_original</span></a>
+                            <span>·</span>
+                            <a href="/pf_original/status/1860000000000009302" dir="ltr" aria-label="Nov 17" role="link"><time datetime="2026-11-17T10:00:00.000Z">Nov 17</time></a>
+                          </div>
+                        </div>
+                        <div data-testid="tweetText" lang="en"><span>Synthetic reposted GIF</span></div>
+                        <div aria-labelledby="id__p2_media">
+                          <div data-testid="videoPlayer">
+                            <div data-testid="videoComponent">
+                              <video aria-label="Embedded video" autoplay="" loop="" muted="" playsinline="" poster="https://pbs.twimg.com/tweet_video_thumb/PfRepostGif.jpg" preload="auto" src="https://video.twimg.com/tweet_video/PfRepostGif.mp4" type="video/mp4" style="width: 506px; height: 380px"></video>
+                            </div>
+                            <div><div><span>GIF</span></div></div>
+                          </div>
+                        </div>
+                        <div role="group" aria-label="0 replies, 0 reposts, 0 likes"></div>
+                      </div>
+                    </article>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+        </div>
+      </main>
+    </div>
+  </body>
+</html>

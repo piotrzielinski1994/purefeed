@@ -228,3 +228,45 @@ describe('Reddit adapter permalink page and scope (AC-031, spec 1.1)', () => {
     expect(comment.matches(adapter.postSelector) && adapter.readPost(comment) !== null).toBe(false);
   });
 });
+
+describe('Reddit adapter popular and all feeds (AC-042)', () => {
+  const FEEDS = [
+    {
+      view: 'r/popular',
+      url: 'https://www.reddit.com/r/popular/',
+      fixture: 'reddit/popular.html',
+      image: { id: 't3_1pfpop1', author: 'pf_paula', sub: 'pf_popular_memes' },
+      gif: { id: 't3_1pfpop2', author: 'pf_pete', sub: 'pf_popular_gifs' },
+    },
+    {
+      view: 'r/all',
+      url: 'https://www.reddit.com/r/all/',
+      fixture: 'reddit/all.html',
+      image: { id: 't3_1pfall2', author: 'pf_adam', sub: 'pf_all_memes' },
+      gif: { id: 't3_1pfall1', author: 'pf_anna', sub: 'pf_all_gifs' },
+    },
+  ];
+  for (const feed of FEEDS) {
+    it(`should read ${feed.view} feed posts with key reddit:t3_<id>, author and subreddit source keys and image and GIF media`, async () => {
+      setUrl(feed.url);
+      const adapter = await loadAdapter();
+      loadFixture(document, feed.fixture);
+      const posts = readAll(adapter);
+      expect(posts.map((p) => p.postKey).sort()).toEqual([`reddit:${feed.image.id}`, `reddit:${feed.gif.id}`].sort());
+      for (const { id, author, sub } of [feed.image, feed.gif]) {
+        const post = postByKey(posts, `reddit:${id}`);
+        expect(post.sourceKeys.toSorted()).toEqual([`reddit:r/${sub}`, `reddit:u/${author}`]);
+        expect(post.permalink).toMatch(new RegExp(`^https://www\\.reddit\\.com/r/${sub}/comments/${id.slice(3)}/`));
+      }
+      expect(postByKey(posts, `reddit:${feed.image.id}`).media.map((m) => [m.el, m.contentType])).toEqual([
+        [document.querySelector(`#${feed.image.id} img[data-post-media-primary]`), 'image'],
+      ]);
+      expect(postByKey(posts, `reddit:${feed.gif.id}`).media.map((m) => [m.el, m.contentType])).toEqual([[shadowVideo(feed.gif.id), 'gif']]);
+      const postMedia = new Set(posts.flatMap((p) => p.media.map((m) => m.el)));
+      expect(
+        [...document.querySelectorAll('main img')].filter((img) => !img.closest('shreddit-post') && postMedia.has(img as HTMLImageElement)),
+      ).toEqual([]);
+      expect(adapter.focalPostKey(new URL(feed.url))).toBeNull();
+    });
+  }
+});
