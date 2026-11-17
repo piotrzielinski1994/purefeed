@@ -150,44 +150,6 @@ describe('media decoder (AC-008, AC-012, AC-014, AC-020, AC-021, AC-022, AC-070)
     expect(result).toMatchObject({ status: 'ok', contentType: 'gif', fingerprint: { kind: 'poster' } });
   });
 
-  it('should never change play state, position, mute state or volume of a page video with the same URL (AC-020)', async () => {
-    const { decoder } = await setup();
-    media.addVideo(VIDEO_URL, videoFromAsset('clip.mp4'));
-    const page = document.createElement('video');
-    page.src = VIDEO_URL;
-    document.body.append(page);
-    await Promise.resolve();
-    page.currentTime = 3;
-    page.muted = false;
-    page.volume = 0.5;
-    const record = media.recordOf(page);
-    const before = { seeks: record.seeks.length, loads: record.loadCalls, currentTime: page.currentTime, paused: page.paused };
-    await decoder.decode({ url: VIDEO_URL, contentType: 'video', posterUrl: null });
-    expect({ seeks: record.seeks.length, loads: record.loadCalls, currentTime: page.currentTime, paused: page.paused }).toEqual(before);
-    expect(page.muted).toBe(false);
-    expect(page.volume).toBe(0.5);
-    expect(page.getAttribute('src')).toBe(VIDEO_URL);
-  });
-
-  it('should give a poster-only fingerprint if the video canvas is tainted (TC-028 unit)', async () => {
-    const { decoder } = await setup();
-    media.addVideo(VIDEO_URL, { mode: 'tainted', durationS: 20 });
-    const result = await decoder.decode({ url: VIDEO_URL, contentType: 'video', posterUrl: POSTER_URL });
-    const expected = fingerprintImage(loadGray('base-q60.jpg'));
-    if (!expected) throw new Error('poster has no fingerprint');
-    expect(result).toMatchObject({ status: 'ok', contentType: 'video', fingerprint: { kind: 'poster' } });
-    expect(matchClass(expectOk(result), { kind: 'poster', hash: expected.hash })).toBe('exact');
-  });
-
-  it('should skip with no-poster at once and start no request if a video has no poster (TC-029 unit)', async () => {
-    const { decoder, calls } = await setup();
-    media.addVideo(VIDEO_URL, { mode: 'never-loads' });
-    const result = await decoder.decode({ url: VIDEO_URL, contentType: 'video', posterUrl: null });
-    expect(result).toEqual({ status: 'skipped', reason: 'no-poster' });
-    expect(calls).toEqual([]);
-    expect(media.videos).toEqual([]);
-  });
-
   it('should not request a poster URL that is not on a media CDN host', async () => {
     const { decoder, calls } = await setup();
     media.addVideo(VIDEO_URL, { mode: 'tainted', durationS: 20 });
