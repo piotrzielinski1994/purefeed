@@ -243,3 +243,30 @@ describe('content type toggle through storage.onChanged (AC-066, TC-086)', () =>
     expect(bg.fingerprintUrls()).toEqual([PAGES.reddit.src]);
   });
 });
+
+describe('no new processing after a toggle goes off (AC-063, AC-065)', () => {
+  const OFF: Array<[string, Settings]> = [
+    ['master toggle', withSettings({ enabled: false })],
+    ['Reddit toggle', platformOff('reddit')],
+  ];
+  for (const [name, off] of OFF) {
+    it(`should send no request for a post inserted or viewed after the ${name} goes off and process it within 1 s after it goes on`, async () => {
+      const { ext, bg, observers, post } = await openPage('reddit', PAGES.reddit.url, DEFAULT_SETTINGS);
+      expect(await within(1000, () => isHidden(post))).toBe(true);
+      await ext.storage.local.set({ settings: off });
+      expect(await within(1000, () => !isHidden(post))).toBe(true);
+      const sent = bg.requests.length;
+      const laterSrc = PAGES.reddit.src.replace('-a.', '-c.');
+      const laterRoot = fragment(document, redditImagePost({ id: '1pfoff', author: 'pf_off', src: laterSrc }));
+      document.body.append(laterRoot);
+      await settle();
+      const later = PAGES.reddit.post(laterRoot);
+      observers.enterLookahead(later, ...mediaEls(later));
+      for (const el of [post, later].flatMap(mediaEls)) observers.setVisible(el, 1);
+      await within(1500, () => false);
+      expect(bg.requests.slice(sent)).toEqual([]);
+      await ext.storage.local.set({ settings: DEFAULT_SETTINGS });
+      expect(await within(1000, () => bg.fingerprintUrls().includes(laterSrc))).toBe(true);
+    });
+  }
+});
