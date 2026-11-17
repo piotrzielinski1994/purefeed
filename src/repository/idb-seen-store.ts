@@ -30,7 +30,7 @@ function openDatabase(factory: IDBFactory): Promise<IDBDatabase> {
 
 export async function openIdbSeenStore(factory: IDBFactory): Promise<SeenStore> {
   const db = await openDatabase(factory);
-  const update = (change: (store: IDBObjectStore) => void): Promise<void> => {
+  const update = async (change: (store: IDBObjectStore) => void): Promise<void> => {
     const tx = db.transaction(STORE, 'readwrite');
     change(tx.objectStore(STORE));
     return completion(tx);

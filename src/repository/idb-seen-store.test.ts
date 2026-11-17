@@ -91,6 +91,23 @@ describe('IndexedDB seen store (AC-035, AC-036, AC-040)', () => {
     expect(loaded.get('rec-2')?.fingerprint).toMatchObject({ frames: expect.any(Uint32Array), timestamps: expect.any(Float32Array) });
   });
 
+  it('should reject, not throw, and keep the stored records if a record cannot be cloned into the store', async () => {
+    const { openIdbSeenStore } = await loadIdb();
+    const store = await openIdbSeenStore(new IDBFactory());
+    await store.write([['kept', RECORD]]);
+    const uncloneable = { ...RECORD, firstSeenPermalink: () => 'no' } as unknown as SeenRecord;
+    const result = (() => {
+      try {
+        return { written: store.write([['bad', uncloneable]]) };
+      } catch (error) {
+        return { thrown: error };
+      }
+    })();
+    expect(result).not.toHaveProperty('thrown');
+    await expect(result.written).rejects.toMatchObject({ name: 'DataCloneError' });
+    expect((await store.loadAll()).map(([id]) => id)).toEqual(['kept']);
+  });
+
   it('should reject if the database cannot be opened', async () => {
     const { openIdbSeenStore } = await loadIdb();
     const factory = new IDBFactory();

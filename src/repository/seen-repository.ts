@@ -32,9 +32,11 @@ export function createSeenRepository({ openStore, now, setTimer, newId }: SeenRe
     if (!store) {
       return Promise.resolve();
     }
-    return op(store).catch(() => {
-      store = null;
-    });
+    return Promise.resolve(store)
+      .then(op)
+      .catch(() => {
+        store = null;
+      });
   };
 
   const writeDirty = (): Promise<void> => {

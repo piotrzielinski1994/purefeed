@@ -66,7 +66,9 @@ function recordOf(fingerprint: Fingerprint, firstSeenAt: number, lastSeenAt: num
   };
 }
 
-async function setup(opts: { seed?: Array<[string, SeenRecord]>; failOpen?: boolean; failWrites?: boolean } = {}) {
+type StoreFault = (store: SeenStore) => SeenStore;
+
+async function setup(opts: { seed?: Array<[string, SeenRecord]>; failOpen?: boolean; failWrites?: boolean; fault?: StoreFault } = {}) {
   const { createSeenRepository } = await loadRepository();
   const { createMemorySeenStore } = await loadStore();
   const clock = createFakeClock();
@@ -75,7 +77,9 @@ async function setup(opts: { seed?: Array<[string, SeenRecord]>; failOpen?: bool
   const { store, writes } = recordingStore(inner, clock, opts.failWrites);
   let n = 0;
   const repo = createSeenRepository({
-    openStore: opts.failOpen ? () => Promise.reject(new DOMException('blocked', 'InvalidStateError')) : async () => store,
+    openStore: opts.failOpen
+      ? () => Promise.reject(new DOMException('blocked', 'InvalidStateError'))
+      : async () => (opts.fault ?? ((x) => x))(store),
     now: clock.now,
     setTimer: clock.setTimer,
     newId: () => `id-${++n}`,
@@ -299,6 +303,58 @@ describe('seen repository clear and failures (AC-040, AC-041)', () => {
     await clock.advance(2000);
     expect(repo.persisted()).toBe(false);
     expect(repo.lookup(imageFp(A), DEFAULT_THRESHOLDS)?.id).toBe(id);
+  });
+});
+
+describe('seen repository store faults (AC-040)', () => {
+  const closedConnection = () => new DOMException('The database connection is closing.', 'InvalidStateError');
+
+  it('should keep matching in memory and never write if loading the stored records fails', async () => {
+    const { repo, clock, writes } = await setup({ fault: (store) => ({ ...store, loadAll: () => Promise.reject(closedConnection()) }) });
+    await expect(repo.ready).resolves.toBeUndefined();
+    expect(repo.persisted()).toBe(false);
+    const { id } = repo.recordSighting(sightingOf(imageFp(A)), DEFAULT_THRESHOLDS);
+    await clock.advance(2000);
+    expect(writes).toEqual([]);
+    expect(repo.lookup(imageFp(A), DEFAULT_THRESHOLDS)?.id).toBe(id);
+  });
+
+  it('should switch persisted to false and keep matching if the store throws at once on write', async () => {
+    const { repo, clock } = await setup({
+      fault: (store) => ({
+        ...store,
+        write: () => {
+          throw closedConnection();
+        },
+      }),
+    });
+    await repo.ready;
+    const { id } = repo.recordSighting(sightingOf(imageFp(A)), DEFAULT_THRESHOLDS);
+    await clock.advance(2000);
+    expect(repo.persisted()).toBe(false);
+    expect(repo.lookup(imageFp(A), DEFAULT_THRESHOLDS)?.id).toBe(id);
+  });
+
+  it('should still drop expired records from memory and switch persisted to false if deleting them from the store fails', async () => {
+    const t = createFakeClock().now();
+    const seed: Array<[string, SeenRecord]> = [['old', recordOf(imageFp(A), t - 40 * DAY_MS, t - 40 * DAY_MS)]];
+    const { repo } = await setup({ seed, fault: (store) => ({ ...store, deleteIds: () => Promise.reject(closedConnection()) }) });
+    await repo.ready;
+    expect(await repo.purge(30)).toBe(1);
+    expect(repo.persisted()).toBe(false);
+    expect(repo.lookup(imageFp(A), DEFAULT_THRESHOLDS)).toBeNull();
+  });
+
+  it('should empty the memory index and switch persisted to false if clearing the store fails', async () => {
+    const t = createFakeClock().now();
+    const { repo } = await setup({
+      seed: [['a', recordOf(imageFp(A), t, t)]],
+      fault: (store) => ({ ...store, clear: () => Promise.reject(closedConnection()) }),
+    });
+    await repo.ready;
+    await expect(repo.clear()).resolves.toBeUndefined();
+    expect(repo.persisted()).toBe(false);
+    expect(repo.lookup(imageFp(A), DEFAULT_THRESHOLDS)).toBeNull();
   });
 });
 
