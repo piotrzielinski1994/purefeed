@@ -864,6 +864,46 @@ describe('content runtime hide indicator and toast (AC-029, AC-051, AC-053, AC-0
     expect(toastTexts()).toEqual(['PureFeed hid 3 duplicates']);
   });
 
+  it('should add hides within 3 s to one toast and start a new count in the same toast after the window (AC-057)', async () => {
+    const { start, reveal, clock, posts } = await setup({
+      posts: [
+        { id: 'w1', top: 0, media: [img(IMG.a)] },
+        { id: 'w2', top: 600, media: [img(IMG.aCopy)] },
+        { id: 'w3', top: 1200, media: [img(IMG.a)] },
+      ],
+      seen: [SEEN_A_ON_WYKOP],
+    });
+    await start();
+    await reveal(posts[0]);
+    await clock.advance(2999);
+    await reveal(posts[1]);
+    expect(posts.map(isHidden)).toEqual([true, true, false]);
+    expect(toastTexts()).toEqual(['PureFeed hid 2 duplicates']);
+    await clock.advance(1);
+    await reveal(posts[2]);
+    expect(isHidden(posts[2])).toBe(true);
+    expect(toastTexts()).toEqual(['PureFeed hid 1 duplicate']);
+  });
+
+  it('should close the toast exactly 4 s after the last hide (AC-057)', async () => {
+    const { start, reveal, clock, posts } = await setup({
+      posts: [
+        { id: 'c1', top: 0, media: [img(IMG.a)] },
+        { id: 'c2', top: 600, media: [img(IMG.aCopy)] },
+      ],
+      seen: [SEEN_A_ON_WYKOP],
+    });
+    await start();
+    await reveal(posts[0]);
+    await clock.advance(1000);
+    await reveal(posts[1]);
+    await clock.advance(3999);
+    expect(toastTexts()).toEqual(['PureFeed hid 2 duplicates']);
+    await clock.advance(1);
+    expect(toastTexts()).toEqual([]);
+    expect(posts.map(isHidden)).toEqual([true, true]);
+  });
+
   it('should show no toast if the toast setting is off and still show the indicator (TC-078)', async () => {
     const { reveal, runtime, posts } = await setup({ posts: [{ id: 't4', media: [img(IMG.a)] }], seen: [SEEN_A_ON_WYKOP] });
     runtime.start();
