@@ -1,0 +1,82 @@
+<!-- biome-ignore-all lint/a11y: mirrors third-party platform markup -->
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Fixture: X status page</title>
+  </head>
+  <body>
+    <!-- Not confirmed live: x.com needs a login. Based on the documented status page structure: the focal article[data-testid="tweet"] (tabindex -1) with its status link holding time, then reply articles in later cellInnerDiv rows. Synthetic text, ids and media. -->
+    <div id="react-root">
+      <main role="main">
+        <div data-testid="primaryColumn">
+          <section role="region" aria-labelledby="accessible-list-1">
+            <div aria-label="Timeline: Conversation">
+              <div style="position: relative; min-height: 3000px">
+                <div data-testid="cellInnerDiv" style="transform: translateY(0px); position: absolute; width: 100%">
+                  <div class="css-175oi2r">
+                    <article aria-labelledby="id__s1" role="article" tabindex="-1" class="css-175oi2r" data-testid="tweet">
+                      <div class="css-175oi2r">
+                        <div data-testid="Tweet-User-Avatar">
+                          <div data-testid="UserAvatar-Container-pf_xavier">
+                            <a href="/pf_xavier" role="link"><img alt="" draggable="true" src="https://pbs.twimg.com/profile_images/1/pf_xavier_normal.jpg" style="width: 40px; height: 40px" /></a>
+                          </div>
+                        </div>
+                        <div data-testid="User-Name">
+                          <div><a href="/pf_xavier" role="link"><span>Synthetic Xavier</span></a></div>
+                          <div><a href="/pf_xavier" role="link" tabindex="-1"><span>@pf_xavier</span></a></div>
+                        </div>
+                        <div data-testid="tweetText" lang="en"><span>Synthetic photo tweet</span></div>
+                        <div aria-labelledby="id__s1_media">
+                          <a href="/pf_xavier/status/1860000000000000001/photo/1" role="link">
+                            <div aria-label="Image" data-testid="tweetPhoto">
+                              <img alt="" draggable="true" src="https://pbs.twimg.com/media/PfPhotoA?format=jpg&amp;name=medium" style="width: 566px; height: 425px" />
+                            </div>
+                          </a>
+                        </div>
+                        <div>
+                          <a href="/pf_xavier/status/1860000000000000001" aria-describedby="id__s1_time" role="link"><time datetime="2026-11-17T10:00:00.000Z">10:00 AM · Nov 17, 2026</time></a>
+                        </div>
+                        <div role="group" aria-label="1 reply, 0 reposts, 0 likes"></div>
+                      </div>
+                    </article>
+                  </div>
+                </div>
+                <div data-testid="cellInnerDiv" style="transform: translateY(700px); position: absolute; width: 100%">
+                  <div class="css-175oi2r">
+                    <article aria-labelledby="id__s2" role="article" tabindex="0" class="css-175oi2r" data-testid="tweet">
+                      <div class="css-175oi2r">
+                        <div data-testid="Tweet-User-Avatar">
+                          <div data-testid="UserAvatar-Container-pf_fred">
+                            <a href="/pf_fred" role="link"><img alt="" draggable="true" src="https://pbs.twimg.com/profile_images/9/pf_fred_normal.jpg" style="width: 40px; height: 40px" /></a>
+                          </div>
+                        </div>
+                        <div data-testid="User-Name">
+                          <div><a href="/pf_fred" role="link"><span>Synthetic Fred</span></a></div>
+                          <div>
+                            <a href="/pf_fred" role="link" tabindex="-1"><span>@pf_fred</span></a>
+                            <span>·</span>
+                            <a href="/pf_fred/status/1860000000000000101" dir="ltr" aria-label="Nov 17" role="link"><time datetime="2026-11-17T10:05:00.000Z">Nov 17</time></a>
+                          </div>
+                        </div>
+                        <div><span>Replying to </span><a href="/pf_xavier" role="link">@pf_xavier</a></div>
+                        <div data-testid="tweetText" lang="en"><span>Synthetic reply with a photo</span></div>
+                        <div aria-labelledby="id__s2_media">
+                          <a href="/pf_fred/status/1860000000000000101/photo/1" role="link">
+                            <div aria-label="Image" data-testid="tweetPhoto">
+                              <img alt="" draggable="true" src="https://pbs.twimg.com/media/PfReplyPhoto?format=jpg&amp;name=small" style="width: 506px; height: 380px" />
+                            </div>
+                          </a>
+                        </div>
+                      </div>
+                    </article>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+        </div>
+      </main>
+    </div>
+  </body>
+</html>
