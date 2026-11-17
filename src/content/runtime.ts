@@ -40,6 +40,7 @@ const NO_RECORDS: ReadonlySet<RecordId> = new Set();
 const UNREADABLE: DecodeResult = { status: 'skipped', reason: 'unreadable' };
 const FALLBACK_AFTER_MS = 10_000;
 const FALLBACK_MIN_MEDIA = 3;
+const LATE_MEDIA_POLL_MS = 500;
 
 type Item = { media: DetectedMedia; contentType: ContentType; fingerprint: Fingerprint; seen: SeenMatch | null; url: string };
 type Slot = { status: 'pending'; contentType: ContentType } | { status: 'skipped' } | { status: 'ok'; item: Item };
@@ -56,6 +57,7 @@ export type ContentRuntimeDeps = {
   setTimer: SetTimer;
   clearTimer: (id: unknown) => void;
   isWhitelisted?: (key: string) => boolean;
+  isContextValid?: () => boolean;
 };
 
 export type ContentRuntime = {
@@ -90,6 +92,8 @@ export function createContentRuntime(deps: ContentRuntimeDeps): ContentRuntime {
   let scanner: PostScanner | null = null;
   let stopWatchingUrl: (() => void) | null = null;
   let fallbackTimer: unknown = null;
+  let lateMediaTimer: unknown = null;
+  const awaitingMedia = new Set<PostState>();
 
   const thresholds = (): Thresholds => ({ exact: settings.exactThreshold, near: settings.nearThreshold });
   const isActive = () => isRunning && settings.enabled && settings.platforms[adapter.platform];
@@ -289,9 +293,34 @@ export function createContentRuntime(deps: ContentRuntimeDeps): ContentRuntime {
     );
   }
 
+  const hasEmptyMediaHost = (el: Element): boolean =>
+    adapter.lateMediaHostSelector !== undefined &&
+    [...el.querySelectorAll(adapter.lateMediaHostSelector)].some((host) => !host.shadowRoot?.querySelector('img, video'));
+
+  function checkLateMedia(): void {
+    lateMediaTimer = null;
+    const waiting = [...awaitingMedia];
+    awaitingMedia.clear();
+    waiting.forEach((state) => {
+      const post = adapter.readPost(state.post.el);
+      if (isCurrent(state) && post?.postKey === state.post.postKey) {
+        state.post = post;
+        processPost(state);
+      }
+    });
+  }
+
+  function awaitLateMedia(state: PostState): void {
+    awaitingMedia.add(state);
+    lateMediaTimer ??= deps.setTimer(checkLateMedia, LATE_MEDIA_POLL_MS);
+  }
+
   function processPost(state: PostState): void {
     if (!isActive() || !inLookahead.has(state.post.el)) {
       return;
+    }
+    if (hasEmptyMediaHost(state.post.el)) {
+      awaitLateMedia(state);
     }
     state.post.media.forEach((media) => {
       if (state.slots.has(media.el) || !isTypeOn(media) || !isMediaItem(media.el)) {
@@ -422,29 +451,47 @@ export function createContentRuntime(deps: ContentRuntimeDeps): ContentRuntime {
     });
   };
 
+  function stop(): void {
+    isRunning = false;
+    deps.clearTimer(fallbackTimer);
+    deps.clearTimer(lateMediaTimer);
+    awaitingMedia.clear();
+    scanner?.disconnect();
+    stopWatchingUrl?.();
+    lookahead.disconnect();
+    disposers.forEach((dispose) => {
+      dispose();
+    });
+    disposers.clear();
+    tracker.dispose();
+    toaster.dispose();
+  }
+
+  const isAlive = (): boolean => {
+    if (deps.isContextValid?.() ?? true) {
+      return true;
+    }
+    stop();
+    return false;
+  };
+
   return {
     start() {
       isRunning = true;
       scanner = createPostScanner({ root: doc, adapter, onPost, onKeyChanged });
-      stopWatchingUrl = watchUrl(deps.win, () => {
-        scanner?.scanNow();
-        reapplyAll();
-      });
+      stopWatchingUrl = watchUrl(
+        deps.win,
+        () => {
+          scanner?.scanNow();
+          reapplyAll();
+        },
+        undefined,
+        isAlive,
+      );
       scanner.scanNow();
       fallbackTimer = deps.setTimer(checkFallback, FALLBACK_AFTER_MS);
     },
-    stop() {
-      isRunning = false;
-      deps.clearTimer(fallbackTimer);
-      scanner?.disconnect();
-      stopWatchingUrl?.();
-      lookahead.disconnect();
-      disposers.forEach((dispose) => {
-        dispose();
-      });
-      disposers.clear();
-      states.forEach(untrackAll);
-    },
+    stop,
     reevaluateAll(next) {
       settings = next;
       reapplyAll();

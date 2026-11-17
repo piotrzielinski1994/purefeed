@@ -29,11 +29,10 @@ if (adapter) {
     now: Date.now,
     setTimer: (fn, ms) => setTimeout(fn, ms),
     clearTimer: (id) => {
-      if (typeof id === 'number') {
-        clearTimeout(id);
-      }
+      clearTimeout(id as Parameters<typeof clearTimeout>[0]);
     },
     isWhitelisted: (key) => whitelist.has(key),
+    isContextValid: () => ext.runtime.id !== undefined,
   });
   settings.onChange((next) => {
     runtime.reevaluateAll(next);

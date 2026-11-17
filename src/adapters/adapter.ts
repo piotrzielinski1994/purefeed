@@ -14,6 +14,7 @@ export type DetectedPost = {
 export type PlatformAdapter = {
   readonly platform: Platform;
   readonly postSelector: string;
+  readonly lateMediaHostSelector?: string;
   readPost(el: Element): DetectedPost | null;
   focalPostKey(url: URL): PostKey | null;
 };

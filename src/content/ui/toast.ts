@@ -1,7 +1,7 @@
 import type { SetTimer } from '../../shared/types.ts';
 import { attachUi, TOAST_CSS } from './styles.ts';
 
-export type Toaster = { notifyHidden(): void };
+export type Toaster = { notifyHidden(): void; dispose(): void };
 
 const messageOf = (count: number) => `PureFeed hid ${count} duplicate${count === 1 ? '' : 's'}`;
 
@@ -13,6 +13,7 @@ export function createToaster(
   let count = 0;
   let isWindowOpen = false;
   let closeTimer: unknown;
+  let windowTimer: unknown;
 
   const mount = () => {
     const { host, root } = attachUi(doc, TOAST_CSS);
@@ -35,7 +36,7 @@ export function createToaster(
       if (!isWindowOpen) {
         count = 0;
         isWindowOpen = true;
-        opts.setTimer(() => {
+        windowTimer = opts.setTimer(() => {
           isWindowOpen = false;
         }, opts.windowMs);
       }
@@ -44,6 +45,12 @@ export function createToaster(
       shown.live.textContent = messageOf(count);
       opts.clearTimer(closeTimer);
       closeTimer = opts.setTimer(close, opts.visibleMs);
+    },
+    dispose() {
+      opts.clearTimer(windowTimer);
+      opts.clearTimer(closeTimer);
+      isWindowOpen = false;
+      close();
     },
   };
 }

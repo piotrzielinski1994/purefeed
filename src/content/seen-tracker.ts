@@ -5,7 +5,7 @@ export type ObserverFactory = (
   init: IntersectionObserverInit,
 ) => Pick<IntersectionObserver, 'observe' | 'unobserve' | 'disconnect'>;
 
-export type SeenTracker = { track(el: Element): void; untrack(el: Element): void };
+export type SeenTracker = { track(el: Element): void; untrack(el: Element): void; dispose(): void };
 
 const SEEN_RATIO = 0.5;
 
@@ -60,5 +60,12 @@ export function createSeenTracker(opts: {
       observer.observe(el);
     },
     untrack,
+    dispose() {
+      timers.forEach((timer) => {
+        opts.clearTimer(timer);
+      });
+      timers.clear();
+      observer.disconnect();
+    },
   };
 }

@@ -7,6 +7,7 @@ const POST_SELECTOR = 'shreddit-post';
 const MEDIA_SELECTOR = ['img[data-post-media-primary]', 'gallery-carousel li figure > img', 'shreddit-player']
   .map((media) => `[slot="post-media-container"] ${media}`)
   .join(', ');
+const PLAYER_SELECTOR = '[slot="post-media-container"] shreddit-player';
 
 function readMedia(el: Element): DetectedMedia[] {
   if (isImage(el)) {
@@ -28,6 +29,7 @@ function readMedia(el: Element): DetectedMedia[] {
 export const redditAdapter: PlatformAdapter = {
   platform: 'reddit',
   postSelector: POST_SELECTOR,
+  lateMediaHostSelector: PLAYER_SELECTOR,
   readPost(el) {
     const id = firstMatch(POST_ID, el.id);
     const permalink = absoluteUrl(el.getAttribute('permalink'), el);

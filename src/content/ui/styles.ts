@@ -1,9 +1,9 @@
 const BASE_CSS = `
 :host {
-  all: initial;
-  display: block;
-  font: 13px/1.4 system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
-  color: #1a1a1b;
+  all: initial !important;
+  display: block !important;
+  font: 13px/1.4 system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif !important;
+  color: #1a1a1b !important;
 }
 button,
 a {
@@ -56,10 +56,10 @@ button {
 
 export const TOAST_CSS = `${BASE_CSS}
 :host {
-  position: fixed;
-  bottom: 16px;
-  right: 16px;
-  z-index: 2147483647;
+  position: fixed !important;
+  bottom: 16px !important;
+  right: 16px !important;
+  z-index: 2147483647 !important;
 }
 .toast {
   padding: 8px 12px;
@@ -67,13 +67,6 @@ export const TOAST_CSS = `${BASE_CSS}
   background: #1a1a1b;
   color: #ffffff;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
-  animation: purefeed-toast-in 150ms ease-out;
-}
-@keyframes purefeed-toast-in {
-  from {
-    opacity: 0;
-    transform: translateY(8px);
-  }
 }
 @media (prefers-reduced-motion: reduce) {
   .toast {
