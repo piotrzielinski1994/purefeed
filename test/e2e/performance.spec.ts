@@ -1,7 +1,7 @@
 import type { BrowserContext, Page } from '@playwright/test';
 import type { Platform } from '../../src/shared/types.ts';
 import { expect, extensionTest as test } from './extension.ts';
-import { FEED_URL, generateFeed, scrollFeed, serveHtml } from './feed-generator.ts';
+import { FEED_URL, feedPage, feedPosts, generateFeed, scrollFeed, serveHtml } from './feed-generator.ts';
 
 type TraceEvent = { name: string; ph: string; ts: number; dur?: number; pid?: number; tid?: number; args?: { data?: { url?: string } } };
 
@@ -33,11 +33,41 @@ function contentStartup(trace: TraceEvent[], extensionId: string): { evaluateMs:
   return { evaluateMs: msOf(evaluate), startMicrotasksMs };
 }
 
-async function traced<T>(context: BrowserContext, page: Page, run: () => Promise<T>): Promise<{ result: T; trace: TraceEvent[] }> {
+const TOP_LEVEL_SLICES = new Set(['ThreadControllerImpl::RunTask', 'BlinkScheduler_PerformMicrotaskCheckpoint']);
+const SAME_TASK_GAP_US = 100;
+
+function pageTasksWithExtensionWork(trace: TraceEvent[], extensionId: string): { tasksMs: number[]; contentThread: string } {
+  const prefix = `chrome-extension://${extensionId}/`;
+  const content = trace.find((e) => e.ph === 'X' && e.name === 'FunctionCall' && e.args?.data?.url === `${prefix}content.js`);
+  if (!content) throw new Error('no content.js callback in the trace');
+  const onThread = trace.filter((e) => e.ph === 'X' && e.pid === content.pid && e.tid === content.tid);
+  const end = (e: TraceEvent): number => e.ts + (e.dur ?? 0);
+  const slices = onThread.filter((e) => TOP_LEVEL_SLICES.has(e.name)).sort((a, b) => a.ts - b.ts || end(b) - end(a));
+  const tasks = slices.reduce<Array<{ ts: number; end: number }>>((acc, slice) => {
+    const last = acc.at(-1);
+    if (last && slice.ts < last.end) {
+      return acc;
+    }
+    if (last && slice.name === 'BlinkScheduler_PerformMicrotaskCheckpoint' && slice.ts - last.end < SAME_TASK_GAP_US) {
+      return [...acc.slice(0, -1), { ts: last.ts, end: end(slice) }];
+    }
+    return [...acc, { ts: slice.ts, end: end(slice) }];
+  }, []);
+  const work = onThread.filter((e) => (e.args?.data?.url ?? '').startsWith(prefix) || e.name === 'RunMicrotasks');
+  const tasksMs = tasks.filter((t) => work.some((e) => e.ts >= t.ts && e.ts < t.end)).map((t) => (t.end - t.ts) / 1000);
+  return { tasksMs, contentThread: `${content.pid}:${content.tid}` };
+}
+
+async function traced<T>(
+  context: BrowserContext,
+  page: Page,
+  run: () => Promise<T>,
+  categories = 'devtools.timeline,v8.execute',
+): Promise<{ result: T; trace: TraceEvent[] }> {
   const cdp = await context.newCDPSession(page);
   const trace: TraceEvent[] = [];
   cdp.on('Tracing.dataCollected', (payload) => trace.push(...(payload.value as unknown as TraceEvent[])));
-  await cdp.send('Tracing.start', { categories: 'devtools.timeline,v8.execute', transferMode: 'ReportEvents' });
+  await cdp.send('Tracing.start', { categories, transferMode: 'ReportEvents' });
   try {
     const result = await run();
     return { result, trace };
@@ -140,6 +170,45 @@ test.describe('performance on 300-post fixture feeds (AC-074, AC-075, AC-077)', 
     const { evaluateMs, startMicrotasksMs } = contentStartup(trace, extensionId);
     expect(startMicrotasksMs.length).toBeGreaterThan(0);
     expect(evaluateMs + startMicrotasksMs.reduce((a, b) => a + b, 0)).toBeLessThanOrEqual(STARTUP_BUDGET_MS);
+  });
+
+  test('should run no page main-thread task over 50 ms that holds extension work and hash pixels on another thread while a 300-post Wykop feed with playing videos scrolls (TC-098)', async ({
+    context,
+    extensionId,
+  }) => {
+    test.setTimeout(300_000);
+    const VIDEO_EVERY = 20;
+    const posts = feedPosts({ platform: 'wykop', posts: 300, duplicates: 30 }).map((post, i) =>
+      post.media === null && i % VIDEO_EVERY === 5
+        ? { ...post, media: { kind: 'video' as const, src: `https://wykop.pl/cdn/c3201142/clip.mp4?pf=v${i}` } }
+        : post,
+    );
+    expect(posts.filter((p) => p.media?.kind === 'video').length).toBeGreaterThanOrEqual(10);
+    const url = FEED_URL.wykop('perf-video');
+    await serveHtml(url, feedPage('wykop', posts, { title: 'Fixture: wykop generated feed with videos', initial: 20 }));
+    const page = await context.newPage();
+    await page.setViewportSize(VIEWPORT);
+    const { trace } = await traced(
+      context,
+      page,
+      async () => {
+        await page.goto(url);
+        await page.waitForTimeout(1_500);
+        await scrollFeed(page, 500);
+        await page.waitForTimeout(2_000);
+      },
+      'devtools.timeline,v8.execute,toplevel',
+    );
+    const played = await page.evaluate(() => [...document.querySelectorAll('video')].filter((v) => v.currentTime > 0).length);
+    expect(played).toBeGreaterThan(0);
+    const { tasksMs, contentThread } = pageTasksWithExtensionWork(trace, extensionId);
+    expect(tasksMs.length).toBeGreaterThan(0);
+    expect(tasksMs.filter((ms) => ms > LONG_TASK_MS).map((ms) => Math.round(ms))).toEqual([]);
+    const hashing = trace.filter(
+      (e) => e.ph === 'X' && e.name === 'FunctionCall' && e.args?.data?.url === `chrome-extension://${extensionId}/hash-worker.js`,
+    );
+    expect(hashing.length).toBeGreaterThan(0);
+    expect(hashing.filter((e) => `${e.pid}:${e.tid}` === contentThread)).toEqual([]);
   });
 
   for (const platform of ['reddit', 'wykop', 'x'] as const) {

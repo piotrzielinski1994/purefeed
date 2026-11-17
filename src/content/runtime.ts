@@ -18,7 +18,6 @@ import type {
   WhitelistEntry,
 } from '../shared/types.ts';
 import { decodeDecodeResult, encodeFingerprint, encodeGrayFrame, encodeSighting } from '../shared/wire.ts';
-import { compareFingerprints } from '../similarity/compare.ts';
 import { hidePost, isHidden, revealPost } from './hider.ts';
 import { createLookaheadQueue } from './lookahead-queue.ts';
 import { watchUrl } from './navigation.ts';
@@ -198,7 +197,7 @@ export function createContentRuntime(deps: ContentRuntimeDeps): ContentRuntime {
   function applyLaterMatches(source: PostState, fp: Fingerprint): void {
     states.forEach((other) => {
       const isLater = other.post.postKey !== source.post.postKey && follows(other.post.el, source.post.el);
-      if (isLater && okItems(other).some((item) => compareFingerprints(fp, item.fingerprint, thresholds()).matchClass !== 'different')) {
+      if (isLater && okItems(other).some((item) => session.compare(fp, item.fingerprint, thresholds()).matchClass !== 'different')) {
         apply(other);
       }
     });
