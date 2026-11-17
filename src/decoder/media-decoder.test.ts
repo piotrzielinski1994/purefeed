@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { assetPath, loadGray } from '../../test/helpers/assets.ts';
 import { createMediaFakes, type FakeMedia, type FakeRoute, installFakeMedia, videoFromAsset } from '../../test/helpers/fake-media.ts';
 import { DEFAULT_THRESHOLDS } from '../../test/helpers/fingerprints.ts';
-import { fingerprintFrameSource } from '../fingerprint/frame-sequence.ts';
+import { fingerprintSequence, sampleTimestamps } from '../fingerprint/frame-sequence.ts';
 import { decodeGif, fingerprintGif } from '../fingerprint/gif-decoder.ts';
 import { resizeArea } from '../fingerprint/gray.ts';
 import { fingerprintImage } from '../fingerprint/image-fingerprint.ts';
@@ -62,13 +62,11 @@ const matchClass = (a: Fingerprint, b: Fingerprint) => compareFingerprints(a, b,
 async function expectedVideoFp(name: string) {
   const spec = videoFromAsset(name);
   if (spec.mode !== 'ok') throw new Error('asset spec');
-  const fp = await fingerprintFrameSource({
-    durationS: spec.durationS,
-    frameAt: async (tS) => resizeArea(spec.frame(tS), SEQUENCE_FRAME_SIZE, SEQUENCE_FRAME_SIZE),
-    dispose: () => {},
-  });
-  if (!fp) throw new Error(`${name}: no expected fingerprint`);
-  return fp;
+  const frames = sampleTimestamps(spec.durationS).map((tS) => ({
+    tS,
+    image: resizeArea(spec.frame(tS), SEQUENCE_FRAME_SIZE, SEQUENCE_FRAME_SIZE),
+  }));
+  return fingerprintSequence(frames, spec.durationS);
 }
 
 describe('media decoder (AC-008, AC-012, AC-014, AC-020, AC-021, AC-022, AC-070)', () => {

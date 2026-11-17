@@ -16,12 +16,6 @@ export type Fingerprint = ImageFingerprint | FrameSequenceFingerprint | PosterFi
 export type Thresholds = { exact: number; near: number };
 export type Comparison = { matchClass: MatchClass; similarity: number };
 
-export type FrameSource = {
-  readonly durationS: number;
-  frameAt(tS: number): Promise<GrayImage | null>;
-  dispose(): void;
-};
-
 export type DecodeRequest = { url: string; contentType: ContentType; posterUrl: string | null };
 export type SkipReason = 'flat' | 'unreadable' | 'no-poster' | 'fetch-failed' | 'host-not-allowed';
 export type DecodeResult = { status: 'ok'; contentType: ContentType; fingerprint: Fingerprint } | { status: 'skipped'; reason: SkipReason };

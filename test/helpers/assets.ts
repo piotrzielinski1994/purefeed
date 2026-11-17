@@ -1,9 +1,15 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { FRAME_FPS, GENERATED_DIR, type ImageMeta, type VideoMeta } from '../../scripts/generate-assets.ts';
-import type { FrameSource, GrayImage } from '../../src/shared/types.ts';
+import type { GrayImage } from '../../src/shared/types.ts';
 
 export { ASSETS } from '../../scripts/generate-assets.ts';
+
+export type FrameSource = {
+  readonly durationS: number;
+  frameAt(tS: number): Promise<GrayImage | null>;
+  dispose(): void;
+};
 
 export const assetPath = (name: string): string => join(GENERATED_DIR, name);
 

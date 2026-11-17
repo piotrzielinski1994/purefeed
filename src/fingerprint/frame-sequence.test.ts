@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { assetPath, loadFrameSource } from '../../test/helpers/assets.ts';
-import type { FrameSequenceFingerprint, FrameSource, GrayImage, Thresholds } from '../shared/types.ts';
+import type { FrameSequenceFingerprint, GrayFrame, Thresholds } from '../shared/types.ts';
 
 const loadFrameSequence = () => import('./frame-sequence.ts');
 const loadGif = () => import('./gif-decoder.ts');
@@ -11,10 +11,16 @@ const ASSET_TEST = { timeout: 60_000 };
 const DEFAULTS: Thresholds = { exact: 95, near: 90 };
 
 async function videoFp(name: string): Promise<FrameSequenceFingerprint> {
-  const { fingerprintFrameSource } = await loadFrameSequence();
-  const fp = await fingerprintFrameSource(loadFrameSource(name));
-  if (!fp) throw new Error(`${name}: no fingerprint`);
-  return fp;
+  const { fingerprintSequence, sampleTimestamps } = await loadFrameSequence();
+  const source = loadFrameSource(name);
+  const frames = await Promise.all(
+    sampleTimestamps(source.durationS).map(async (tS): Promise<GrayFrame> => {
+      const image = await source.frameAt(tS);
+      if (!image) throw new Error(`${name}: no frame at ${tS} s`);
+      return { tS, image };
+    }),
+  );
+  return fingerprintSequence(frames, source.durationS);
 }
 
 async function gifFp(name: string): Promise<FrameSequenceFingerprint> {
@@ -29,23 +35,6 @@ async function classify(a: string, b: string): Promise<[string, string]> {
   const fa = await videoFp(a);
   const fb = await videoFp(b);
   return [compareFingerprints(fa, fb, DEFAULTS).matchClass, compareFingerprints(fb, fa, DEFAULTS).matchClass];
-}
-
-function textured(seed: number): GrayImage {
-  const data = new Uint8Array(96 * 96);
-  for (let i = 0; i < data.length; i++) data[i] = ((Math.floor(i / 96) >> 3) * 37 + ((i % 96) >> 3) * 91 + seed * 53) % 256;
-  return { width: 96, height: 96, data };
-}
-
-function clockedSource(durationS: number, msPerFrame: number, clock: { t: number }, frame: (tS: number) => GrayImage | null): FrameSource {
-  return {
-    durationS,
-    frameAt: async (tS) => {
-      clock.t += msPerFrame;
-      return frame(tS);
-    },
-    dispose: () => {},
-  };
 }
 
 describe('frame timestamps (AC-015)', () => {
@@ -90,45 +79,6 @@ describe('frame source fingerprint (AC-015)', () => {
     const hashes = new Set<string>();
     for (let i = 0; i < 8; i++) hashes.add(`${fp.frames[2 * i]}:${fp.frames[2 * i + 1]}`);
     expect(hashes.size).toBe(8);
-  });
-
-  it('should return null if every frame arrives after the 10 s default deadline', async () => {
-    const { fingerprintFrameSource } = await loadFrameSequence();
-    const clock = { t: 0 };
-    const src = clockedSource(20, 11_000, clock, (tS) => textured(Math.round(tS)));
-    expect(await fingerprintFrameSource(src, { now: () => clock.t })).toBeNull();
-  });
-
-  it('should return 8 frames if every frame arrives within the deadline', async () => {
-    const { fingerprintFrameSource } = await loadFrameSequence();
-    const clock = { t: 0 };
-    const src = clockedSource(20, 1_000, clock, (tS) => textured(Math.round(tS)));
-    const fp = await fingerprintFrameSource(src, { now: () => clock.t });
-    expect(fp?.timestamps.length).toBe(8);
-  });
-
-  it('should apply the given deadlineMs if it is shorter than 10 s', async () => {
-    const { fingerprintFrameSource } = await loadFrameSequence();
-    const clock = { t: 0 };
-    const src = clockedSource(20, 1_000, clock, (tS) => textured(Math.round(tS)));
-    expect(await fingerprintFrameSource(src, { deadlineMs: 500, now: () => clock.t })).toBeNull();
-  });
-
-  it('should return null if no frame can be read', async () => {
-    const { fingerprintFrameSource } = await loadFrameSequence();
-    const clock = { t: 0 };
-    expect(
-      await fingerprintFrameSource(
-        clockedSource(20, 10, clock, () => null),
-        { now: () => clock.t },
-      ),
-    ).toBeNull();
-  });
-
-  it('should resolve null if frameAt never settles before deadlineMs', { timeout: 5_000 }, async () => {
-    const { fingerprintFrameSource } = await loadFrameSequence();
-    const src: FrameSource = { durationS: 20, frameAt: () => new Promise<GrayImage | null>(() => {}), dispose: () => {} };
-    expect(await fingerprintFrameSource(src, { deadlineMs: 50 })).toBeNull();
   });
 });
 
