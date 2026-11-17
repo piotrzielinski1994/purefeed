@@ -270,3 +270,60 @@ describe('real adapters in the content runtime: lazy media and recycled elements
     await expectRecycledElementReprocessed('x');
   });
 });
+
+const AUTHOR_KEY: Record<Platform, string> = { reddit: 'reddit:u/pf_trusted', wykop: 'wykop:@pf_trusted', x: 'x:@pf_trusted' };
+const AUTHOR_IDS: Record<Platform, [string, string, string]> = {
+  reddit: ['1pfaut1', '1pfaut2', '1pfaut3'],
+  wykop: ['7101', '7102', '7103'],
+  x: ['1860000000000007101', '1860000000000007102', '1860000000000007103'],
+};
+
+function clickAlwaysShowAuthor(post: Element): void {
+  const host = [post.previousElementSibling, post.nextElementSibling].find((el) => el?.hasAttribute('data-purefeed-ui'));
+  const root = host ? shadowRoots.get(host) : undefined;
+  const button = [...(root?.querySelectorAll('button') ?? [])].find((b) => {
+    const text = textOf(b);
+    return text.startsWith('Always show ') && text !== 'Always show this post';
+  });
+  if (!button) throw new Error('no Always show <author> button');
+  button.click();
+}
+
+async function expectAuthorAlwaysShown(platform: Platform) {
+  const c = CASES[platform];
+  const [firstId, laterId, otherId] = AUTHOR_IDS[platform];
+  const [srcA, srcB] = SRC[platform];
+  const clock = createFakeClock(NOW);
+  const bg = createFakeBackground({
+    media: { [srcA]: okImage(imageFp(HB)), [srcB]: okImage(imageFp(flip(HB, 1))) },
+    seed: [seenB(platform)],
+    now: clock.now,
+  });
+  const session = await openSession({ platform, url: c.url, container: c.container, bg, clock });
+  const firstRoot = fragment(document, c.markup(firstId, srcA).replaceAll(`pf_${firstId}`, 'pf_trusted'));
+  c.feed().append(firstRoot);
+  await settle();
+  const first = c.post(firstRoot);
+  await session.reveal(first);
+  expect(isHidden(first)).toBe(true);
+  clickAlwaysShowAuthor(first);
+  await settle();
+  expect(bg.of('whitelist/add').map((r) => r.entry)).toEqual([{ type: 'source', key: AUTHOR_KEY[platform] }]);
+  expect(isHidden(first)).toBe(false);
+  const laterRoot = fragment(document, c.markup(laterId, srcB).replaceAll(`pf_${laterId}`, 'pf_trusted'));
+  const otherRoot = fragment(document, c.markup(otherId, srcB));
+  c.feed().append(laterRoot, otherRoot);
+  await settle();
+  const [later, other] = [c.post(laterRoot), c.post(otherRoot)];
+  await session.reveal(later, other);
+  expect(session.adapter.readPost(later)?.sourceKeys).toContain(AUTHOR_KEY[platform]);
+  expect([isHidden(later), isHidden(other)]).toEqual([false, true]);
+}
+
+describe('real adapters in the content runtime: Always show <author> (AC-055, TC-074)', () => {
+  for (const platform of ['reddit', 'wykop', 'x'] as const) {
+    it(`should whitelist the ${platform} author and keep a later post of that author with seen media visible (TC-074)`, async () => {
+      await expectAuthorAlwaysShown(platform);
+    });
+  }
+});
