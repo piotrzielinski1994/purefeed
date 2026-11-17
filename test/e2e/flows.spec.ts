@@ -429,12 +429,10 @@ test.describe('unreadable page video frames in Chromium (AC-022)', () => {
     const stalled = 'https://wykop.pl/stall/clip.mp4?pf=tc029';
     const page = await openFeed(context, 'wykop', 'tc029', [videoEntry('s1', '93000061', stalled), videoEntry('s2', '93000062', stalled)]);
     const loadedAt = await page.evaluate(() => performance.timeOrigin);
-    await expect.poll(async () => (await frames()).length, { timeout: 30_000 }).toBe(2);
+    await expect.poll(async () => (await frames()).length, { timeout: 30_000 }).toBe(1);
+    await page.waitForTimeout(1_500);
     const received = await frames();
-    expect(received.map((m) => [m.count, m.posterUrl])).toEqual([
-      [0, null],
-      [0, null],
-    ]);
+    expect(received.map((m) => [m.count, m.posterUrl])).toEqual([[0, null]]);
     received.forEach((m) => {
       expect(m.at - loadedAt).toBeGreaterThanOrEqual(10_000);
       expect(m.at - loadedAt).toBeLessThan(20_000);

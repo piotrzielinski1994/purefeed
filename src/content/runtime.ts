@@ -268,27 +268,44 @@ export function createContentRuntime(deps: ContentRuntimeDeps): ContentRuntime {
 
   function sampleVideo(state: PostState, media: DetectedMedia, video: HTMLVideoElement): void {
     const url = video.currentSrc || video.src;
-    const sendFrames = (frames: GrayFrame[] | null) => {
-      const durationS = Number.isFinite(video.duration) ? video.duration : 0;
-      const request = { type: 'media/frames', frames: (frames ?? []).map(encodeGrayFrame), durationS, posterUrl: media.posterUrl } as const;
-      queue.push({ el: video, run: () => resolveItem(state, media, url, send(request).then(decodeDecodeResult)) });
-    };
-    whenDuration(
-      video,
-      (durationS) => {
-        const dispose = createVideoSampler(video, {
-          targets: sampleTimestamps(durationS),
-          size: FRAME_SIDE,
-          timeoutMs: FRAME_TIMEOUT_MS,
-          onDone: (frames) => {
-            disposers.delete(dispose);
-            sendFrames(frames);
+    const cached = url ? session.urlResults.get(url) : undefined;
+    if (cached) {
+      cached.catch(() => UNREADABLE).then(() => queue.push({ el: video, run: () => resolveItem(state, media, url, cached) }));
+      return;
+    }
+    const result = new Promise<DecodeResult>((resolve) => {
+      const sendFrames = (frames: GrayFrame[] | null) => {
+        const durationS = Number.isFinite(video.duration) ? video.duration : 0;
+        const request = { type: 'media/frames', frames: (frames ?? []).map(encodeGrayFrame), durationS, posterUrl: media.posterUrl } as const;
+        queue.push({
+          el: video,
+          run: () => {
+            const sent = send(request).then(decodeDecodeResult);
+            resolve(sent);
+            return resolveItem(state, media, url, sent);
           },
         });
-        disposers.add(dispose);
-      },
-      () => sendFrames(null),
-    );
+      };
+      whenDuration(
+        video,
+        (durationS) => {
+          const dispose = createVideoSampler(video, {
+            targets: sampleTimestamps(durationS),
+            size: FRAME_SIDE,
+            timeoutMs: FRAME_TIMEOUT_MS,
+            onDone: (frames) => {
+              disposers.delete(dispose);
+              sendFrames(frames);
+            },
+          });
+          disposers.add(dispose);
+        },
+        () => sendFrames(null),
+      );
+    });
+    if (url) {
+      session.urlResults.set(url, result);
+    }
   }
 
   const hasEmptyMediaHost = (el: Element): boolean =>

@@ -671,6 +671,43 @@ describe('content runtime page videos (AC-014, AC-015, AC-020, AC-021, AC-022)',
     expect(posts.map(isHidden)).toEqual([false, true]);
   });
 
+  it('should sample a page video URL once per page session and reuse its fingerprint for 3 posts carrying it (TC-017)', async () => {
+    setUrl('https://wykop.pl/');
+    const { start, reveal, bg, posts } = await setup({
+      platform: 'wykop',
+      posts: ['w1', 'w2', 'w3'].map((id, i) => ({
+        id,
+        top: i * 600,
+        media: [{ kind: 'video' as const, src: WYKOP_CLIP, width: 640, height: 360 }],
+      })),
+    });
+    await start();
+    await reveal(...posts);
+    await playVideos(
+      posts.map((p) => mediaOf(p) as HTMLVideoElement),
+      20,
+    );
+    expect(bg.of('media/frames').map((r) => r.frames.length)).toEqual([8]);
+    expect(posts.map(isHidden)).toEqual([false, true, true]);
+  });
+
+  it('should sample a blob video URL once if a re-rendered feed shows it in a second element (TC-017)', async () => {
+    const { start, reveal, bg, posts } = await setup({
+      posts: [
+        { id: 'b1', top: 0, media: [{ kind: 'video', src: CLIP_BLOB, width: 640, height: 360 }] },
+        { id: 'b2', top: 600, media: [{ kind: 'video', src: CLIP_BLOB, width: 640, height: 360 }] },
+      ],
+    });
+    await start();
+    await reveal(...posts);
+    await playVideos(
+      posts.map((p) => mediaOf(p) as HTMLVideoElement),
+      20,
+    );
+    expect(bg.of('media/frames')).toHaveLength(1);
+    expect(posts.map(isHidden)).toEqual([false, true]);
+  });
+
   it('should not hide a video that shares only its opening with a seen video if the timeout cuts sampling short (AC-015)', async () => {
     const SHARED_INTRO_S = 5;
     const DURATION_S = 20;
