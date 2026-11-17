@@ -1,4 +1,6 @@
 import type { DetectedMedia, DetectedPost, PlatformAdapter } from '../adapters/adapter.ts';
+import { isMediaItem, isVideo } from '../adapters/dom-utils.ts';
+import { createFallbackAdapter } from '../adapters/generic-fallback.ts';
 import type { sendRequest } from '../compat/messaging.ts';
 import { decidePost, type ItemEvidence, type PostDecision } from '../engine/post-decision.ts';
 import { sampleTimestamps } from '../fingerprint/frame-sequence.ts';
@@ -27,7 +29,6 @@ import { createIndicator } from './ui/indicator.ts';
 import { createToaster } from './ui/toast.ts';
 import { createVideoSampler } from './video-sampler.ts';
 
-const MIN_MEDIA_PX = 150;
 const LOOKAHEAD_MARGIN = '0px 0px 150% 0px';
 const CONCURRENT_JOBS = 4;
 const DWELL_MS = 1000;
@@ -37,6 +38,8 @@ const TOAST_WINDOW_MS = 3000;
 const TOAST_VISIBLE_MS = 4000;
 const NO_RECORDS: ReadonlySet<RecordId> = new Set();
 const UNREADABLE: DecodeResult = { status: 'skipped', reason: 'unreadable' };
+const FALLBACK_AFTER_MS = 10_000;
+const FALLBACK_MIN_MEDIA = 3;
 
 type Item = { media: DetectedMedia; contentType: ContentType; fingerprint: Fingerprint; seen: SeenMatch | null; url: string };
 type Slot = { status: 'pending'; contentType: ContentType } | { status: 'skipped' } | { status: 'ok'; item: Item };
@@ -62,17 +65,11 @@ export type ContentRuntime = {
   revealAll(filter?: (p: DetectedPost) => boolean): void;
 };
 
-const isVideo = (el: DetectedMedia['el']): el is HTMLVideoElement => el.tagName === 'VIDEO';
-
-function isRendered(el: Element): boolean {
-  const { width, height } = el.getBoundingClientRect();
-  return width >= MIN_MEDIA_PX && height >= MIN_MEDIA_PX;
-}
-
 const follows = (el: Element, other: Element): boolean => Boolean(other.compareDocumentPosition(el) & Node.DOCUMENT_POSITION_FOLLOWING);
 
 export function createContentRuntime(deps: ContentRuntimeDeps): ContentRuntime {
-  const { adapter, doc, send } = deps;
+  const { doc, send } = deps;
+  let adapter = deps.adapter;
   const session = createPageSession(deps.now);
   const states = new Map<Element, PostState>();
   const elementOfKey = new Map<string, Element>();
@@ -92,6 +89,7 @@ export function createContentRuntime(deps: ContentRuntimeDeps): ContentRuntime {
   let isRunning = false;
   let scanner: PostScanner | null = null;
   let stopWatchingUrl: (() => void) | null = null;
+  let fallbackTimer: unknown = null;
 
   const thresholds = (): Thresholds => ({ exact: settings.exactThreshold, near: settings.nearThreshold });
   const isActive = () => isRunning && settings.enabled && settings.platforms[adapter.platform];
@@ -296,7 +294,7 @@ export function createContentRuntime(deps: ContentRuntimeDeps): ContentRuntime {
       return;
     }
     state.post.media.forEach((media) => {
-      if (state.slots.has(media.el) || !isTypeOn(media) || !isRendered(media.el)) {
+      if (state.slots.has(media.el) || !isTypeOn(media) || !isMediaItem(media.el)) {
         return;
       }
       if (isVideo(media.el)) {
@@ -397,6 +395,26 @@ export function createContentRuntime(deps: ContentRuntimeDeps): ContentRuntime {
     revealPost(el);
   }
 
+  function checkFallback(): void {
+    fallbackTimer = null;
+    if (states.size > 0) {
+      return;
+    }
+    const mediaItems = [...doc.querySelectorAll('img, video')].filter(isMediaItem).length;
+    if (!isActive() || doc.querySelector(adapter.postSelector) !== null || mediaItems < FALLBACK_MIN_MEDIA) {
+      fallbackTimer = deps.setTimer(checkFallback, FALLBACK_AFTER_MS);
+      return;
+    }
+    adapter = createFallbackAdapter(deps.adapter.platform, deps.win.location.host);
+    scanner?.disconnect();
+    scanner = createPostScanner({ root: doc, adapter, onPost, onKeyChanged });
+    scanner.scanNow();
+    send({
+      type: 'log/warn',
+      message: `PureFeed: the ${adapter.platform} adapter found no posts for ${FALLBACK_AFTER_MS / 1000} s; generic fallback active`,
+    }).catch(() => undefined);
+  }
+
   const reapplyAll = () => {
     states.forEach((state) => {
       processPost(state);
@@ -413,9 +431,11 @@ export function createContentRuntime(deps: ContentRuntimeDeps): ContentRuntime {
         reapplyAll();
       });
       scanner.scanNow();
+      fallbackTimer = deps.setTimer(checkFallback, FALLBACK_AFTER_MS);
     },
     stop() {
       isRunning = false;
+      deps.clearTimer(fallbackTimer);
       scanner?.disconnect();
       stopWatchingUrl?.();
       lookahead.disconnect();

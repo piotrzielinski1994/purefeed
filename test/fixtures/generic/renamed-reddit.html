@@ -1,0 +1,51 @@
+<!-- biome-ignore-all lint/a11y: mirrors third-party platform markup -->
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Fixture: Reddit feed with a renamed post element</title>
+  </head>
+  <body>
+    <!-- The www.reddit.com home feed of reddit/home.html after a hypothetical redesign: shreddit-post renamed to shreddit-post-v2, the article wrapper kept. Synthetic text, ids and media. -->
+    <shreddit-app>
+      <main id="main-content">
+        <shreddit-feed>
+          <article class="w-full m-0" aria-label="Synthetic renamed post one">
+            <shreddit-post-v2 data-post-id="t3_1pfren1" view-context="AggregateFeed">
+              <a slot="credit-bar-community" href="https://communities.example.test/pf_memes">r/pf_memes</a>
+              <a slot="full-post-link" class="absolute inset-0" href="https://www.reddit.com/r/pf_memes/comments/1pfren1/synthetic_renamed_one/" target="_self">Synthetic renamed post one</a>
+              <span slot="credit-bar" class="flex">
+                <a aria-label="Author: u/pf_mia" href="https://www.reddit.com/user/pf_mia/"><img class="h-full w-full" src="https://www.redditstatic.com/avatars/defaults/v2/avatar_default_1.png" alt="u/pf_mia avatar" style="width: 24px; height: 24px" />pf_mia</a>
+              </span>
+              <div slot="post-media-container" class="block w-full">
+                <img data-post-media-primary="" alt="Synthetic renamed post one" class="preview-img" src="https://preview.redd.it/pf-renamed-v0-r1.png?width=640&amp;crop=smart&amp;auto=webp&amp;s=pfr1" style="width: 545px; height: 540px" />
+              </div>
+            </shreddit-post-v2>
+          </article>
+          <article class="w-full m-0" aria-label="Synthetic renamed post two">
+            <shreddit-post-v2 data-post-id="t3_1pfren2" view-context="AggregateFeed">
+              <a slot="full-post-link" class="absolute inset-0" href="https://www.reddit.com/r/pf_memes/comments/1pfren2/synthetic_renamed_two/" target="_self">Synthetic renamed post two</a>
+              <span slot="credit-bar" class="flex">
+                <a aria-label="Author: u/pf_noah" href="https://www.reddit.com/user/pf_noah/"><img class="h-full w-full" src="https://www.redditstatic.com/avatars/defaults/v2/avatar_default_2.png" alt="u/pf_noah avatar" style="width: 24px; height: 24px" />pf_noah</a>
+              </span>
+              <div slot="post-media-container" class="block w-full">
+                <img data-post-media-primary="" alt="Synthetic renamed post two" class="preview-img" src="https://preview.redd.it/pf-renamed-v0-r2.png?width=640&amp;crop=smart&amp;auto=webp&amp;s=pfr2" style="width: 545px; height: 540px" />
+              </div>
+            </shreddit-post-v2>
+          </article>
+          <article class="w-full m-0" aria-label="Synthetic renamed post three">
+            <shreddit-post-v2 data-post-id="t3_1pfren3" view-context="AggregateFeed">
+              <a slot="full-post-link" class="absolute inset-0" href="https://www.reddit.com/r/pf_memes/comments/1pfren3/synthetic_renamed_three/" target="_self">Synthetic renamed post three</a>
+              <span slot="credit-bar" class="flex">
+                <a aria-label="Author: u/pf_olga" href="https://www.reddit.com/user/pf_olga/"><img class="h-full w-full" src="https://www.redditstatic.com/avatars/defaults/v2/avatar_default_3.png" alt="u/pf_olga avatar" style="width: 24px; height: 24px" />pf_olga</a>
+              </span>
+              <div slot="post-media-container" class="block w-full">
+                <img data-post-media-primary="" alt="Synthetic renamed post three" class="preview-img" src="https://preview.redd.it/pf-renamed-v0-r3.png?width=640&amp;crop=smart&amp;auto=webp&amp;s=pfr3" style="width: 545px; height: 540px" />
+              </div>
+            </shreddit-post-v2>
+          </article>
+        </shreddit-feed>
+      </main>
+    </shreddit-app>
+  </body>
+</html>
