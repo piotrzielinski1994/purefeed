@@ -448,6 +448,44 @@ test.describe('unreadable page video frames in Chromium (AC-022)', () => {
   });
 });
 
+test.describe('cross-origin image URL the extension uses (AC-012)', () => {
+  test('should fingerprint a cross-origin image from the currentSrc the page picked from srcset and request only that URL (TC-016)', async ({
+    context,
+    serviceWorker,
+    extensionPage,
+    server,
+  }) => {
+    await serviceWorker.evaluate(() => {
+      type Message = { type?: string; req?: { url?: string } };
+      const g = globalThis as unknown as {
+        __pfUrls: string[];
+        chrome: { runtime: { onMessage: { addListener(l: (m: Message) => void): void } } };
+      };
+      g.__pfUrls = [];
+      g.chrome.runtime.onMessage.addListener((m) => {
+        if (m?.type === 'media/fingerprint') g.__pfUrls.push(m.req?.url ?? '');
+      });
+    });
+    const url = FEED_URL.x('tc016');
+    const html = feedPage('x', [imgPost('x', 'c1', '1870000000000000016', 'base.png')]);
+    expect(html).toContain(' 2x"');
+    await serveHtml(url, html.replace(' 2x"', ' 1x"'));
+    const page = await context.newPage();
+    await page.goto(url);
+    await expect.poll(() => uniqueItems(extensionPage), { timeout: 30_000 }).toBe(1);
+    const photo = await page
+      .locator('[data-pf-index="c1"] img[alt="Image"]')
+      .evaluate((img: HTMLImageElement) => ({ currentSrc: img.currentSrc, src: img.src }));
+    expect(photo.currentSrc).toMatch(/^https:\/\/pbs\.twimg\.com\/media\/base\.png\?.*name=large/);
+    expect(photo.src).toMatch(/name=small/);
+    expect(await serviceWorker.evaluate(() => (globalThis as unknown as { __pfUrls: string[] }).__pfUrls)).toEqual([photo.currentSrc]);
+    const used = new URL(photo.currentSrc);
+    expect(server.log.filter((e) => e.fromExtension).map((e) => ({ host: e.host, path: e.path, hasBody: e.hasBody }))).toEqual([
+      { host: used.host, path: `${used.pathname}${used.search}`, hasBody: false },
+    ]);
+  });
+});
+
 test.describe('stopped service worker (AC-007)', () => {
   test('should hide a fixture post with seen image A in the page after the service worker is stopped (TC-007)', async ({
     context,
