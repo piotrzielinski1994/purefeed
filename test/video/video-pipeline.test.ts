@@ -214,12 +214,12 @@ describe('unreadable page video frames through runtime, background, decoder and 
     await clock.advance(FRAME_TIMEOUT_MS - 1);
     expect(framesRequests()).toEqual([]);
     await clock.advance(1);
-    expect(framesRequests().map((e) => [e.req, e.res])).toEqual(
-      Array.from({ length: 2 }, () => [
+    expect(framesRequests().map((e) => [e.req, e.res])).toEqual([
+      [
         { type: 'media/frames', frames: [], durationS: 0, posterUrl: null },
         { status: 'skipped', reason: 'no-poster' },
-      ]),
-    );
+      ],
+    ]);
     posts.forEach((post) => {
       observers.setVisible(mediaOf(post), 1);
     });
