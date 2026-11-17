@@ -104,6 +104,7 @@ A hidden post stays in the page; a bar takes its place:
 - A repost with an added logo or watermark counts as new content: the caption guard checks the whole image, corners included, so such a copy is not hidden.
 - Third-party embeds (for example YouTube iframes on Wykop and Reddit) are not fingerprinted.
 - Animated WebP and AVIF images use the first frame only, as an image.
+- An animated GIF in an `<img>` element counts as an image until it is decoded: with the image toggle off it is not fingerprinted; with the GIF toggle off it is still fetched once but never hides a post.
 - Retention purge runs at each background start and on a 24 h alarm; each background restart creates the alarm again, so its 24 h period starts over.
 - Firefox has no automated end-to-end tests (Playwright cannot load Firefox extensions); Firefox is covered by unit tests, `npm run lint:firefox` and the manual smoke steps M2, M3 and M5.
 - Automated E2E (end-to-end) tests run in Playwright Chromium 151; the minimum versions Chrome 120 and Firefox 128 are not tested.
@@ -209,7 +210,7 @@ A hidden post stays in the page; a bar takes its place:
 | AC-063 | Master toggle in open tabs                           | `src/content/main.test.ts`, `test/e2e/flows.spec.ts`                                                     |
 | AC-064 | Settings saved at once in `storage.local`            | `src/shared/settings.test.ts`, `test/ui/extension-pages.test.ts`                                         |
 | AC-065 | Platform toggle reveals                              | `src/content/main.test.ts`, `test/e2e/flows.spec.ts`                                                     |
-| AC-066 | Content type toggle                                  | `src/content/runtime.test.ts`, `test/ui/extension-pages.test.ts`                                         |
+| AC-066 | Content type toggle                                  | `src/content/runtime.test.ts`, `src/content/main.test.ts`, `test/ui/extension-pages.test.ts`             |
 | AC-067 | Options page content                                 | `test/ui/extension-pages.test.ts`                                                                        |
 | AC-068 | Threshold validation                                 | `src/shared/settings.test.ts`, `test/ui/extension-pages.test.ts`                                         |
 | AC-069 | Permission needed state                              | `test/ui/extension-pages.test.ts`, M3                                                                    |

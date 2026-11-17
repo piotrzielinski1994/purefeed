@@ -227,3 +227,19 @@ describe('stored whitelist in a new page session (AC-054, AC-055, AC-056, TC-073
     expect(await within(1000, () => [post, ...others].every(isHidden))).toBe(true);
   });
 });
+
+describe('content type toggle through storage.onChanged (AC-066, TC-086)', () => {
+  it('should reveal an image post within 1 s and fingerprint no later image if the image toggle is turned off', async () => {
+    const { ext, bg, observers, post } = await openPage('reddit', PAGES.reddit.url, DEFAULT_SETTINGS);
+    expect(await within(1000, () => isHidden(post))).toBe(true);
+    await ext.storage.local.set({ settings: withSettings({ contentTypes: { ...DEFAULT_SETTINGS.contentTypes, image: false } }) });
+    expect(await within(1000, () => !isHidden(post))).toBe(true);
+    const laterRoot = fragment(document, redditImagePost({ id: '1pflater', author: 'pf_late', src: PAGES.reddit.src.replace('-a.', '-b.') }));
+    document.body.append(laterRoot);
+    await settle();
+    const later = PAGES.reddit.post(laterRoot);
+    observers.enterLookahead(later, ...mediaEls(later));
+    await within(300, () => false);
+    expect(bg.fingerprintUrls()).toEqual([PAGES.reddit.src]);
+  });
+});

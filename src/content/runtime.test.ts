@@ -715,6 +715,27 @@ describe('content runtime settings re-evaluation (AC-066)', () => {
     expect(posts.map(isHidden)).toEqual([false, true]);
   });
 
+  it.each(['image', 'gif', 'video'] as const)('should send no fingerprint request for %s media if its toggle is turned off', async (type) => {
+    const { start, reveal, runtime, bg, posts } = await setup({
+      posts: [
+        { id: 'ti', top: 0, media: [img(IMG.a)] },
+        { id: 'tg', top: 600, media: [{ kind: 'video', src: GIF_VIDEO, poster: GIF_POSTER, type: 'gif', width: 640, height: 360 }] },
+        { id: 'tv', top: 1200, media: [{ kind: 'video', src: TAINTED_VIDEO, poster: VIDEO_POSTER, width: 640, height: 360 }] },
+      ],
+    });
+    await start();
+    runtime.reevaluateAll({ ...DEFAULT_SETTINGS, contentTypes: { ...DEFAULT_SETTINGS.contentTypes, [type]: false } });
+    await reveal(...posts);
+    await playVideos(
+      posts.slice(1).map((p) => mediaOf(p) as HTMLVideoElement),
+      12,
+      0.5,
+    );
+    const posterType = (posterUrl: string | null) => (posterUrl === GIF_POSTER ? 'gif' : 'video');
+    const requested = [...bg.fingerprintUrls().map(() => 'image'), ...bg.of('media/frames').map((r) => posterType(r.posterUrl))];
+    expect(requested.sort()).toEqual(['gif', 'image', 'video'].filter((t) => t !== type));
+  });
+
   it('should reveal every hidden post if deduplication is turned off', async () => {
     const { start, reveal, runtime, posts } = await setup({ posts: [{ id: 'off1', media: [img(IMG.a)] }], seen: [SEEN_A_ON_WYKOP] });
     await start();

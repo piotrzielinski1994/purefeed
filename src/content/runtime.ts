@@ -98,8 +98,7 @@ export function createContentRuntime(deps: ContentRuntimeDeps): ContentRuntime {
   const thresholds = (): Thresholds => ({ exact: settings.exactThreshold, near: settings.nearThreshold });
   const isActive = () => isRunning && settings.enabled && settings.platforms[adapter.platform];
   const isCurrent = (state: PostState) => isRunning && states.get(state.post.el) === state;
-  const isTypeOn = (media: DetectedMedia) =>
-    isVideo(media.el) ? settings.contentTypes[media.contentType] : settings.contentTypes.image || settings.contentTypes.gif;
+  const isTypeOn = (media: DetectedMedia) => settings.contentTypes[media.contentType];
 
   const queue = createLookaheadQueue<Job>({
     concurrency: CONCURRENT_JOBS,
