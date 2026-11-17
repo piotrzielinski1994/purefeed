@@ -12,6 +12,7 @@ import {
   hostResolverRules,
   launchExtension,
   sendFromPage,
+  stopServiceWorkers,
   extensionTest as test,
 } from './extension.ts';
 import { FEED_URL, type FeedPost, feedPage, isBrowserServiceRequest, mediaUrl, serveHtml } from './feed-generator.ts';
@@ -444,6 +445,28 @@ test.describe('unreadable page video frames in Chromium (AC-022)', () => {
     const stallRequests = server.log.filter((e) => e.path.startsWith('/stall/clip.mp4'));
     expect(stallRequests.length).toBeGreaterThan(0);
     expect(stallRequests.filter((e) => e.fromExtension)).toEqual([]);
+  });
+});
+
+test.describe('stopped service worker (AC-007)', () => {
+  test('should hide a fixture post with seen image A in the page after the service worker is stopped (TC-007)', async ({
+    context,
+    extensionPage,
+  }) => {
+    test.setTimeout(120_000);
+    const seen = await openFeed(context, 'reddit', 'tc007-seen', [imgPost('reddit', 'a', 'pf7a', 'base.png')]);
+    await expect.poll(() => uniqueItems(extensionPage), { timeout: 30_000 }).toBe(1);
+    await seen.close();
+    await extensionPage.waitForTimeout(2_500);
+    await stopServiceWorkers(context, extensionPage);
+
+    const page = await openFeed(context, 'reddit', 'tc007-after-stop', [
+      imgPost('reddit', 'n', 'pf7n', 'other-1.png'),
+      imgPost('reddit', 'r', 'pf7r', 'base-50.png'),
+    ]);
+    await expect.poll(() => isHidden(page, 'r'), { timeout: 30_000 }).toBe(true);
+    expect(await isHidden(page, 'n')).toBe(false);
+    expect((await indicatorOf(page, 'r'))?.text).toMatch(/^Hidden by PureFeed: exact, seen on Reddit/);
   });
 });
 
