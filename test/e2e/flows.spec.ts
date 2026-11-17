@@ -486,6 +486,46 @@ test.describe('cross-origin image URL the extension uses (AC-012)', () => {
   });
 });
 
+async function idbRecords(page: Page): Promise<Array<{ db: string; store: string; keys: string[] }>> {
+  return page.evaluate(async () => {
+    const request = <T>(r: IDBRequest<T>) =>
+      new Promise<T>((resolve, reject) => {
+        r.onsuccess = () => resolve(r.result);
+        r.onerror = () => reject(r.error);
+      });
+    const out: Array<{ db: string; store: string; keys: string[] }> = [];
+    for (const info of await indexedDB.databases()) {
+      if (!info.name) continue;
+      const db = await request(indexedDB.open(info.name));
+      for (const store of [...db.objectStoreNames]) {
+        const values = await request(db.transaction(store).objectStore(store).getAll());
+        for (const value of values) out.push({ db: info.name, store, keys: Object.keys(value as object).sort() });
+      }
+      db.close();
+    }
+    return out;
+  });
+}
+
+test.describe('seen record storage location (AC-035)', () => {
+  test('should store 1 record with exactly the 8 fields in the extension IndexedDB and nothing in the Reddit page origin (TC-049)', async ({
+    context,
+    extensionPage,
+  }) => {
+    const page = await openFeed(context, 'reddit', 'tc049', [imgPost('reddit', 'a', 'pf49a', 'base.png')]);
+    await expect.poll(async () => (await idbRecords(extensionPage)).length, { timeout: 30_000 }).toBe(1);
+    expect(await idbRecords(extensionPage)).toEqual([
+      {
+        db: 'purefeed',
+        store: 'seen',
+        keys: ['contentType', 'fingerprint', 'firstSeenAt', 'firstSeenPermalink', 'firstSeenPostKey', 'lastSeenAt', 'platform', 'seenCount'],
+      },
+    ]);
+    expect(await page.evaluate(() => indexedDB.databases())).toEqual([]);
+    expect(await page.evaluate(() => [localStorage.length, sessionStorage.length])).toEqual([0, 0]);
+  });
+});
+
 test.describe('stopped service worker (AC-007)', () => {
   test('should hide a fixture post with seen image A in the page after the service worker is stopped (TC-007)', async ({
     context,
