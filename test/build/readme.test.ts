@@ -205,3 +205,36 @@ describe('README.md test map (AC-081, TC-104)', () => {
     expect([...new Set(missing)]).toEqual([]);
   });
 });
+
+describe('README.md scope limits and test map content (AC-079, AC-081, TC-102, TC-104)', () => {
+  it('should name the unsupported new.reddit.com legacy layout and twitter.com in the limitations section (spec 1.1)', () => {
+    const items = bullets(section(/limitation/i));
+    expect(items.some((item) => /new\.reddit\.com/.test(item))).toBe(true);
+    expect(items.some((item) => /twitter\.com/.test(item))).toBe(true);
+  });
+
+  it('should map each ticket test category to a test file whose test titles cover that category', () => {
+    const TOPICS: Record<string, RegExp> = {
+      'fingerprint algorithms': /fingerprint|pHash|hash|edge map|crop/i,
+      'similarity thresholds': /threshold|exact|near|similarity/i,
+      'cross-platform detection': /seen on (Wykop|Reddit|X)|cross-platform|first seen on/i,
+      'resize and compression': /resiz|recompress|quality|scale|convert/i,
+      'video frame matching': /frame|video|GIF/i,
+      'dynamic DOM changes': /insert|mutation|lazy|navigation|re-render|reuse|append/i,
+      'false positives': /caption|screenshot|logo|different/i,
+      'IndexedDB persistence': /IndexedDB|database|record|restart/i,
+    };
+    const lines = bullets(section(/test map/i));
+    const titlesOf = (file: string): string[] =>
+      [...readFileSync(join(ROOT, file), 'utf8').matchAll(/\b(?:it|test|describe)\(\s*[`'"]([^`'"]+)[`'"]/g)].map((m) => m[1]);
+    const uncovered = Object.entries(CATEGORIES)
+      .filter(([name, pattern]) => {
+        const files = lines.filter((line) => pattern.test(line)).flatMap(testFilesIn);
+        return !files.some((file) => titlesOf(file).some((title) => TOPICS[name].test(title)));
+      })
+      .map(([name]) => name);
+    expect(uncovered).toEqual([]);
+    const empty = [...new Set(lines.flatMap(testFilesIn))].filter((file) => titlesOf(file).length === 0);
+    expect(empty).toEqual([]);
+  });
+});
