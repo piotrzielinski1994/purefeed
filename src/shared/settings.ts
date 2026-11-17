@@ -16,7 +16,7 @@ export type SettingsSource = {
   onChange(cb: (next: Settings, prev: Settings) => void): () => void;
 };
 
-const SETTINGS_KEY = 'settings';
+export const SETTINGS_KEY = 'settings';
 
 const withDefaults = (stored: unknown): Settings =>
   typeof stored === 'object' && stored !== null ? { ...DEFAULT_SETTINGS, ...stored } : DEFAULT_SETTINGS;
