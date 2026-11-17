@@ -345,3 +345,25 @@ describe('synthetic test assets (AC-080)', () => {
     expect(ignored.status).toBe(0);
   });
 });
+
+describe('caption change size of caption-a-small.png (AC-027, TC-039)', () => {
+  const changedBox = (a: GrayImage, b: GrayImage) => {
+    const changed = Array.from(a.data, (v, i) => (Math.abs(v - b.data[i]) > 32 ? i : -1)).filter((i) => i >= 0);
+    const xs = changed.map((i) => i % a.width);
+    const ys = changed.map((i) => Math.floor(i / a.width));
+    const box = { left: Math.min(...xs), right: Math.max(...xs), top: Math.min(...ys), bottom: Math.max(...ys) };
+    return { box, areaPercent: (100 * (box.right - box.left + 1) * (box.bottom - box.top + 1)) / a.data.length };
+  };
+
+  it('should change only one caption text region of about 1% of the image area against caption-a.png', async () => {
+    const { loadGray } = await import('../helpers/assets.ts');
+    const base = loadGray('caption-a.png');
+    const small = loadGray('caption-a-small.png');
+    expect([small.width, small.height]).toEqual([base.width, base.height]);
+    const { box, areaPercent } = changedBox(base, small);
+    expect(areaPercent).toBeGreaterThanOrEqual(1);
+    expect(areaPercent).toBeLessThan(1.5);
+    expect(box.top).toBeGreaterThan(base.height * 0.8);
+    expect(changedBox(base, loadGray('caption-b.png')).areaPercent).toBeGreaterThan(10);
+  });
+});
