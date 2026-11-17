@@ -3,14 +3,10 @@ import { ext } from '../compat/browser.ts';
 import { sendRequest } from '../compat/messaging.ts';
 import { WHITELIST_KEY } from '../engine/whitelist-store.ts';
 import { createSettingsSource } from '../shared/settings.ts';
-import type { WhitelistEntry } from '../shared/types.ts';
+import { whitelistEntries } from '../shared/whitelist.ts';
 import { createContentRuntime } from './runtime.ts';
 
-const isEntry = (value: unknown): value is WhitelistEntry =>
-  typeof value === 'object' && value !== null && 'key' in value && typeof value.key === 'string';
-
-const whitelistKeys = (stored: unknown): ReadonlySet<string> =>
-  new Set((Array.isArray(stored) ? stored : []).filter(isEntry).map((e) => e.key));
+const whitelistKeys = (stored: unknown): ReadonlySet<string> => new Set(whitelistEntries(stored).map((e) => e.key));
 
 const adapter = adapterForHost(location.host);
 

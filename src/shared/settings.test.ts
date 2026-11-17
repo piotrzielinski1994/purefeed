@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createFakeExt, settle } from '../../test/helpers/fake-ext.ts';
-import type { Settings } from './types.ts';
+import type { RetentionDays, Settings } from './types.ts';
 
 const loadSettings = () => import('./settings.ts');
 
@@ -79,5 +79,73 @@ describe('settings defaults and source (AC-036, AC-064)', () => {
     await settle();
     expect(calls).toBe(0);
     expect(source.get().enabled).toBe(false);
+  });
+});
+
+const THRESHOLD_ORDER = 'Similar threshold must be lower than exact threshold.';
+
+describe('settings patch validation (AC-068)', () => {
+  it('should merge a valid patch into the current settings', async () => {
+    const { validateSettingsPatch } = await loadSettings();
+    const current: Settings = { ...SPEC_DEFAULTS, mode: 'exact', toast: false };
+    expect(validateSettingsPatch(current, { nearThreshold: 85, retentionDays: 90 })).toEqual({
+      ok: true,
+      value: { ...current, nearThreshold: 85, retentionDays: 90 },
+    });
+  });
+
+  it('should reject a near threshold at or above the exact threshold with the spec message (TC-088)', async () => {
+    const { validateSettingsPatch } = await loadSettings();
+    const current: Settings = { ...SPEC_DEFAULTS, exactThreshold: 90, nearThreshold: 85 };
+    expect(validateSettingsPatch(current, { nearThreshold: 92 })).toEqual({ ok: false, field: 'nearThreshold', message: THRESHOLD_ORDER });
+    expect(validateSettingsPatch(current, { nearThreshold: 90 })).toEqual({ ok: false, field: 'nearThreshold', message: THRESHOLD_ORDER });
+  });
+
+  it('should reject an exact threshold lowered to the near threshold with the spec message', async () => {
+    const { validateSettingsPatch } = await loadSettings();
+    const result = validateSettingsPatch(SPEC_DEFAULTS, { exactThreshold: 90 });
+    expect(result.ok).toBe(false);
+    expect(result.ok ? '' : result.message).toBe(THRESHOLD_ORDER);
+  });
+
+  it('should reject a near threshold outside 75-99 with a range message (TC-088)', async () => {
+    const { validateSettingsPatch } = await loadSettings();
+    for (const nearThreshold of [74, Number.NaN]) {
+      const result = validateSettingsPatch(SPEC_DEFAULTS, { nearThreshold });
+      expect(result, String(nearThreshold)).toMatchObject({ ok: false, field: 'nearThreshold' });
+      expect(result.ok ? '' : result.message, String(nearThreshold)).toMatch(/75\D.*99/);
+    }
+    const atMax = validateSettingsPatch({ ...SPEC_DEFAULTS, exactThreshold: 100 }, { nearThreshold: 100 });
+    expect(atMax).toMatchObject({ ok: false, field: 'nearThreshold' });
+  });
+
+  it('should reject an exact threshold outside 90-100 with a range message', async () => {
+    const { validateSettingsPatch } = await loadSettings();
+    const current: Settings = { ...SPEC_DEFAULTS, nearThreshold: 80 };
+    for (const exactThreshold of [89, 101]) {
+      const result = validateSettingsPatch(current, { exactThreshold });
+      expect(result, String(exactThreshold)).toMatchObject({ ok: false, field: 'exactThreshold' });
+      expect(result.ok ? '' : result.message, String(exactThreshold)).toMatch(/90\D.*100/);
+    }
+  });
+
+  it('should accept the range boundaries exact 90 with near 75 and exact 100 with near 99', async () => {
+    const { validateSettingsPatch } = await loadSettings();
+    expect(validateSettingsPatch(SPEC_DEFAULTS, { exactThreshold: 90, nearThreshold: 75 })).toMatchObject({ ok: true });
+    expect(validateSettingsPatch(SPEC_DEFAULTS, { exactThreshold: 100, nearThreshold: 99 })).toMatchObject({ ok: true });
+  });
+
+  it('should accept retention 7, 30, 90 days and forever and reject any other period', async () => {
+    const { validateSettingsPatch } = await loadSettings();
+    for (const retentionDays of [7, 30, 90, null] satisfies RetentionDays[]) {
+      expect(validateSettingsPatch(SPEC_DEFAULTS, { retentionDays }), String(retentionDays)).toEqual({
+        ok: true,
+        value: { ...SPEC_DEFAULTS, retentionDays },
+      });
+    }
+    expect(validateSettingsPatch(SPEC_DEFAULTS, { retentionDays: 14 as unknown as RetentionDays })).toMatchObject({
+      ok: false,
+      field: 'retentionDays',
+    });
   });
 });
