@@ -832,6 +832,54 @@ test.describe('page CSS isolation on Wykop and X (AC-060)', () => {
   }
 });
 
+test.describe('toast resolved layout (AC-057, TC-077)', () => {
+  test('should place the toast fixed 16 px from the bottom and right viewport edges and keep the page focus', async ({ context }) => {
+    const page = await openFeed(
+      context,
+      'reddit',
+      'toast-layout',
+      [imgPost('reddit', 'o', 'pf57a', 'base.png'), imgPost('reddit', 'd', 'pf57b', 'base-50.png')],
+      {
+        script: `const input = document.createElement('input'); input.id = 'pf-focus'; document.body.prepend(input); input.focus();`,
+      },
+    );
+    await expect.poll(() => isHidden(page, 'd'), { timeout: 30_000 }).toBe(true);
+    const toast = await toastOf(page);
+    if (!toast?.contentBackendNodeId) throw new Error('no toast');
+    const cdp = await context.newCDPSession(page);
+    const layout = async () => {
+      const border = async (backendNodeId: number) =>
+        ((await cdp.send('DOM.getBoxModel', { backendNodeId })) as { model: { border: number[] } }).model.border;
+      const [host, content] = [await border(toast.backendNodeId), await border(toast.contentBackendNodeId as number)];
+      return { host, content };
+    };
+    await cdp.send('DOM.enable');
+    await cdp.send('CSS.enable');
+    await cdp.send('DOM.getDocument', { depth: -1, pierce: true });
+    const { nodeIds } = (await cdp.send('DOM.pushNodesByBackendIdsToFrontend', { backendNodeIds: [toast.backendNodeId] })) as {
+      nodeIds: number[];
+    };
+    const { computedStyle } = (await cdp.send('CSS.getComputedStyleForNode', { nodeId: nodeIds[0] })) as {
+      computedStyle: Array<{ name: string; value: string }>;
+    };
+    const style = Object.fromEntries(
+      computedStyle.filter((p) => ['position', 'right', 'bottom'].includes(p.name)).map((p) => [p.name, p.value]),
+    );
+    const viewport = page.viewportSize() as { width: number; height: number };
+    const before = await layout();
+    const [, , right, , , bottom] = before.host;
+    await page.evaluate(() => scrollBy(0, 300));
+    await page.waitForTimeout(200);
+    const after = await layout();
+    await cdp.detach();
+    expect(style).toEqual({ position: 'fixed', right: '16px', bottom: '16px' });
+    expect([viewport.width - right, viewport.height - bottom]).toEqual([16, 16]);
+    expect(after).toEqual(before);
+    expect(before.content[0]).toBeGreaterThan(viewport.width / 2);
+    expect(await page.evaluate(() => document.activeElement?.id)).toBe('pf-focus');
+  });
+});
+
 type Box = { left: number; top: number; right: number; bottom: number };
 type IndicatorLayout = {
   bar: Box;

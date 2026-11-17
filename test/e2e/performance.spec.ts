@@ -49,9 +49,11 @@ function pageTasksWithExtensionWork(trace: TraceEvent[], extensionId: string): {
       return acc;
     }
     if (last && slice.name === 'BlinkScheduler_PerformMicrotaskCheckpoint' && slice.ts - last.end < SAME_TASK_GAP_US) {
-      return [...acc.slice(0, -1), { ts: last.ts, end: end(slice) }];
+      last.end = end(slice);
+      return acc;
     }
-    return [...acc, { ts: slice.ts, end: end(slice) }];
+    acc.push({ ts: slice.ts, end: end(slice) });
+    return acc;
   }, []);
   const work = onThread.filter((e) => (e.args?.data?.url ?? '').startsWith(prefix) || e.name === 'RunMicrotasks');
   const tasksMs = tasks.filter((t) => work.some((e) => e.ts >= t.ts && e.ts < t.end)).map((t) => (t.end - t.ts) / 1000);
