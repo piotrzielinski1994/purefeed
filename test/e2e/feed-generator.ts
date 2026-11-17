@@ -3,7 +3,7 @@ import type { Platform } from '../../src/shared/types.ts';
 import { redditImagePost, wykopImageEntry, xPhotoTweet } from '../helpers/platform-markup.ts';
 import { type RequestLogEntry, servePage } from './server.ts';
 
-export type FeedMedia = { kind: 'img'; src: string } | { kind: 'video'; src: string; poster?: string; muted?: boolean };
+export type FeedMedia = { kind: 'img'; src: string } | { kind: 'video'; src: string; poster?: string; muted?: boolean; loop?: boolean };
 export type FeedPost = { id: string; author: string; media: FeedMedia | null; marks?: Record<string, string> };
 export type FeedPageOpts = { title?: string; css?: string; headScript?: string; script?: string; initial?: number };
 
@@ -73,7 +73,7 @@ function wykopEntry(p: FeedPost): string {
     <div class="media">
       <section class="multimedia">
         <div class="video">
-          <video id="pf-video-${p.id}" src="${escapeAttr(p.media.src)}"${p.media.poster ? ` poster="${escapeAttr(p.media.poster)}"` : ''} autoplay${p.media.muted === false ? '' : ' muted'} playsinline preload="auto" style="width: 320px; height: 180px"></video>
+          <video id="pf-video-${p.id}" src="${escapeAttr(p.media.src)}"${p.media.poster ? ` poster="${escapeAttr(p.media.poster)}"` : ''} autoplay${p.media.muted === false ? '' : ' muted'}${p.media.loop ? ' loop' : ''} playsinline preload="auto" style="width: 320px; height: 180px"></video>
         </div>
       </section>
     </div>`

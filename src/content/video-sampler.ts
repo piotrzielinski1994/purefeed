@@ -25,6 +25,7 @@ export function createVideoSampler(
 ): () => void {
   const remaining = new Set(opts.targets);
   const frames: GrayFrame[] = [];
+  let latest: GrayFrame | null = null;
   let timeout: ReturnType<typeof setTimeout> | undefined;
 
   const dispose = () => {
@@ -42,26 +43,43 @@ export function createVideoSampler(
     timeout = setTimeout(finish, opts.timeoutMs);
   };
 
-  function onTimeUpdate() {
-    const tS = video.currentTime;
-    const due = [...remaining].filter((target) => target <= tS && tS - target <= MAX_LAG_S);
-    if (video.readyState < HAVE_CURRENT_DATA || due.length === 0) {
-      return;
+  const take = (frame: GrayFrame, targets: number[]) => {
+    if (targets.length > 0 && !frames.includes(frame)) {
+      frames.push(frame);
     }
-    try {
-      frames.push({ tS, image: drawFrame(video, opts.size) });
-    } catch {
-      finish();
-      return;
-    }
-    due.forEach((target) => {
+    targets.forEach((target) => {
       remaining.delete(target);
     });
+  };
+
+  function onTimeUpdate() {
+    const tS = video.currentTime;
+    const before = remaining.size;
+    const last = latest;
+    if (last && tS < last.tS) {
+      take(
+        last,
+        [...remaining].filter((target) => target > last.tS && target - last.tS <= MAX_LAG_S),
+      );
+    }
+    const due = [...remaining].filter((target) => target <= tS && tS - target <= MAX_LAG_S);
+    const isTargetAhead = [...remaining].some((target) => target > tS && target - tS <= MAX_LAG_S);
+    if (video.readyState >= HAVE_CURRENT_DATA && (due.length > 0 || isTargetAhead)) {
+      try {
+        latest = { tS, image: drawFrame(video, opts.size) };
+      } catch {
+        finish();
+        return;
+      }
+      take(latest, due);
+    }
     if (remaining.size === 0) {
       finish();
       return;
     }
-    armTimeout();
+    if (remaining.size < before) {
+      armTimeout();
+    }
   }
 
   video.addEventListener('timeupdate', onTimeUpdate);

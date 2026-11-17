@@ -171,6 +171,23 @@ describe('createVideoSampler (AC-015, AC-020, AC-022)', () => {
     expect(done).toEqual([null]);
   });
 
+  it('should take the frame of the last tick before a loop wraps for a target that no tick reaches (AC-016)', async () => {
+    const { createVideoSampler } = await loadSampler();
+    const { sampleTimestamps } = await import('../fingerprint/frame-sequence.ts');
+    const LOOP_URL = 'blob:https://x.com/7f6c1a2e-0000-4000-8000-000000000002';
+    const CHROMIUM_TICKS_S = [0, 0.259, 0.525, 0.791, 1.056, 1.322];
+    media.addVideo(LOOP_URL, videoFromAsset('loop.mp4'));
+    const { video } = await pageVideo(LOOP_URL);
+    const setPlayhead = Object.getOwnPropertyDescriptor(HTMLMediaElement.prototype, 'currentTime')?.set;
+    const { done, onDone } = collect();
+    createVideoSampler(video, { targets: sampleTimestamps(1.5), size: SIZE, timeoutMs: 10_000, onDone });
+    for (const tS of [...CHROMIUM_TICKS_S, ...CHROMIUM_TICKS_S, ...CHROMIUM_TICKS_S]) {
+      setPlayhead?.call(video, tS);
+      await settle(2);
+    }
+    expect(done.map((frames) => frames?.map((f) => f.tS))).toEqual([[0.259, 0.525, 0.791, 1.056, 1.322]]);
+  });
+
   it('should stop sampling and never answer after it is disposed', async () => {
     const { createVideoSampler } = await loadSampler();
     const { video, play } = await pageVideo(BLOB_URL);

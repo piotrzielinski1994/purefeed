@@ -163,7 +163,7 @@ const imgPost = (platform: Platform, index: string, id: string, asset: string, a
   media: { kind: 'img', src: mediaUrl(platform, asset, index) },
   marks: { 'data-pf-index': index },
 });
-const videoEntry = (index: string, id: string, src: string, extra: { muted?: boolean } = {}): FeedPost => ({
+const videoEntry = (index: string, id: string, src: string, extra: { muted?: boolean; loop?: boolean } = {}): FeedPost => ({
   id,
   author: `pf_${index}`,
   media: { kind: 'video', src, ...extra },
@@ -305,6 +305,44 @@ test.describe('passive page video sampling in Chromium (AC-015, AC-017, AC-018, 
     await expect.poll(async () => [await isHidden(later, 'r1'), await isHidden(later, 'r2')], { timeout: 90_000 }).toEqual([true, true]);
     await expect.poll(() => uniqueItems(extensionPage), { timeout: 60_000 }).toBeGreaterThanOrEqual(2);
     expect(await isHidden(later, 'r3')).toBe(false);
+    expect((await indicatorOf(later, 'r1'))?.text).toMatch(/Hidden by PureFeed: exact, seen on Wykop/);
+    expect((await indicatorOf(later, 'r2'))?.text).toMatch(/Hidden by PureFeed: similar, seen on Wykop/);
+    expect(extensionVideoTraffic(server.log)).toEqual([]);
+  });
+
+  test('should hide the VP9 360p copy of a seen H.264 720p clip as exact, the clip with an outro as similar and the MP4 of a seen GIF (TC-021, TC-022, TC-024)', async ({
+    context,
+    extensionPage,
+    server,
+  }) => {
+    test.setTimeout(240_000);
+    const tall = { width: 1280, height: 1000 };
+    const first = await openFeed(
+      context,
+      'wykop',
+      'video-seen-720',
+      [videoEntry('s1', '93000031', 'https://wykop.pl/cdn/c3201142/clip-720.mp4'), imgPost('wykop', 's2', '93000032', 'loop.gif')],
+      {},
+      tall,
+    );
+    await expect.poll(() => uniqueItems(extensionPage), { timeout: 60_000 }).toBe(2);
+    await first.close();
+
+    const later = await openFeed(
+      context,
+      'wykop',
+      'video-repost-720',
+      [
+        videoEntry('r1', '93000041', 'https://wykop.pl/cdn/c3201142/clip-360.webm'),
+        videoEntry('r2', '93000042', 'https://wykop.pl/cdn/c3201142/clip-outro.mp4'),
+        videoEntry('r3', '93000043', 'https://wykop.pl/cdn/c3201142/loop.mp4', { loop: true }),
+      ],
+      {},
+      tall,
+    );
+    await expect
+      .poll(async () => [await isHidden(later, 'r1'), await isHidden(later, 'r2'), await isHidden(later, 'r3')], { timeout: 120_000 })
+      .toEqual([true, true, true]);
     expect((await indicatorOf(later, 'r1'))?.text).toMatch(/Hidden by PureFeed: exact, seen on Wykop/);
     expect((await indicatorOf(later, 'r2'))?.text).toMatch(/Hidden by PureFeed: similar, seen on Wykop/);
     expect(extensionVideoTraffic(server.log)).toEqual([]);
