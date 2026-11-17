@@ -731,3 +731,26 @@ describe('options page (AC-038, AC-041, AC-056, AC-064, AC-066, AC-067, AC-068)'
     }
   });
 });
+
+describe('settings storage area of the extension pages (AC-064, TC-084)', () => {
+  it('should never touch storage.sync in the popup or the options page, even if storage.sync holds other settings', async () => {
+    const host = await createHost({ settings: { ...DEFAULT_SETTINGS, retentionDays: 90 } });
+    await host.ext.storage.sync.set({ settings: { ...DEFAULT_SETTINGS, enabled: false, retentionDays: 7 } });
+    const syncAccess: string[] = [];
+    host.chrome.storage.sync = new Proxy(host.ext.storage.sync, {
+      get(target, key, receiver) {
+        syncAccess.push(String(key));
+        return Reflect.get(target, key, receiver);
+      },
+    });
+    await openPage('popup', host);
+    expect(await until(() => pageText().includes('Duplicates hidden'))).toBe(true);
+    toggle(MASTER).click();
+    expect(await until(() => host.tab.get().enabled === false)).toBe(true);
+    await openPage('options', host);
+    await settle();
+    expect(host.stored()).toEqual({ ...DEFAULT_SETTINGS, retentionDays: 90, enabled: false });
+    expect(syncAccess).toEqual([]);
+    expect(host.ext.storage.sync.dump()).toEqual({ settings: { ...DEFAULT_SETTINGS, enabled: false, retentionDays: 7 } });
+  });
+});
