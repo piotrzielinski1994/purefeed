@@ -1,0 +1,79 @@
+<!-- biome-ignore-all lint/a11y: mirrors third-party platform markup -->
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Fixture: Reddit post permalink page</title>
+  </head>
+  <body>
+    <!-- Mirrors the www.reddit.com/r/<name>/comments/<id>/<slug>/ DOM seen in Chromium on 2026-11-17: main > shreddit-post (view-context CommentsPage, no article wrapper), comments are shreddit-comment elements outside the post. The comment image markup is synthetic. -->
+    <shreddit-app>
+      <main id="main-content">
+        <shreddit-post
+          id="t3_1pfprm1"
+          permalink="/r/pf_memes/comments/1pfprm1/synthetic_focal_post/"
+          content-href="https://i.redd.it/1pfprm1.png"
+          view-context="CommentsPage"
+          post-type="image"
+          domain="i.redd.it"
+          author="pf_kate"
+          author-id="t2_pf0011"
+          subreddit-prefixed-name="r/pf_memes"
+          subreddit-name="pf_memes"
+          post-title="Synthetic focal post"
+        >
+          <div slot="credit-bar" class="flex">
+            <a aria-label="Author: u/pf_kate" href="https://www.reddit.com/user/pf_kate/">
+              <span avatar=""><img class="h-full w-full" src="https://www.redditstatic.com/avatars/defaults/v2/avatar_default_2.png" alt="u/pf_kate avatar" style="width: 32px; height: 32px" /></span>
+              pf_kate
+            </a>
+          </div>
+          <h1 slot="title">Synthetic focal post</h1>
+          <div slot="post-media-container" class="block w-full">
+            <div class="relative overflow-hidden">
+              <div id="t3_1pfprm1-aspect-ratio" data-aspect-ratio-container="">
+                <div class="absolute inset-0 h-full">
+                  <shreddit-media-lightbox-listener class="contents" post-id="t3_1pfprm1">
+                    <div class="media-lightbox-img h-full w-full">
+                      <img alt="" role="presentation" class="absolute top-1/2 -translate-y-1/2" src="https://preview.redd.it/pf-focal-v0-1pfprm1.png?width=1080&amp;crop=smart&amp;auto=webp&amp;s=pfp1" style="width: 732px; height: 732px" />
+                      <img
+                        data-post-media-primary=""
+                        alt="r/pf_memes - Synthetic focal post"
+                        class="i18n-post-media-img preview-img non-lightboxed-content"
+                        src="https://preview.redd.it/pf-focal-v0-1pfprm1.png?width=1080&amp;crop=smart&amp;auto=webp&amp;s=pfp1"
+                        width="1080"
+                        height="1080"
+                        style="width: 640px; height: 640px"
+                      />
+                      <div class="lightboxed-content hidden">
+                        <zoomable-img class="flex w-full h-full"><img class="z-1 max-h-full max-w-full" alt="" src="https://i.redd.it/1pfprm1.png" /></zoomable-img>
+                      </div>
+                    </div>
+                  </shreddit-media-lightbox-listener>
+                </div>
+              </div>
+            </div>
+          </div>
+        </shreddit-post>
+        <shreddit-comment-tree id="comment-tree" post-id="t3_1pfprm1">
+          <shreddit-comment
+            created="2026-11-17T09:00:00.000000+0000"
+            author="pf_liam"
+            thingid="t1_pfcmt1"
+            depth="0"
+            permalink="/r/pf_memes/comments/1pfprm1/comment/pfcmt1/"
+            postid="t3_1pfprm1"
+            content-type="image"
+          >
+            <div slot="comment" class="md">
+              <p>Synthetic comment with an image reply.</p>
+              <figure class="rte-media">
+                <img src="https://preview.redd.it/pf-comment-v0-pfcmt1.png?width=480&amp;auto=webp&amp;s=pfc1" alt="Synthetic comment" style="width: 300px; height: 300px" />
+              </figure>
+            </div>
+          </shreddit-comment>
+        </shreddit-comment-tree>
+      </main>
+    </shreddit-app>
+  </body>
+</html>
