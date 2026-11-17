@@ -8,12 +8,16 @@ export type IndexMatch = { id: RecordId; record: SeenRecord; comparison: Compari
 const HASH_WORDS = 2;
 const CROP_COUNT = 16;
 const SLOT_WORDS = HASH_WORDS + CROP_COUNT * HASH_WORDS;
-const GAP_MIN = CROP_COUNT;
-const GAP_MAX = CROP_COUNT + 1;
-const SLOT_GAPS = CROP_COUNT + 2;
+const GAP_WORDS = 3;
 const INITIAL_SLOTS = 1024;
 const DISTANCES = Array.from({ length: HASH_BITS + 1 }, (_, d) => d);
 const CLASS_RANK: Record<MatchClass, number> = { exact: 2, near: 1, different: 0 };
+
+const gapSetOf = (gaps: readonly number[]): Uint32Array =>
+  gaps.reduce((set, gap) => {
+    set[gap >>> 5] |= 1 << (gap & 31);
+    return set;
+  }, new Uint32Array(GAP_WORDS));
 
 const isBetter = (m: IndexMatch, best: IndexMatch | null): boolean =>
   best === null ||
@@ -26,7 +30,8 @@ export class SeenIndex {
   readonly #otherIds = new Set<RecordId>();
   #imageIds: RecordId[] = [];
   #imageWords = new Uint32Array(INITIAL_SLOTS * SLOT_WORDS);
-  #cropGaps = new Uint8Array(INITIAL_SLOTS * SLOT_GAPS);
+  #cropGaps = new Uint8Array(INITIAL_SLOTS * CROP_COUNT);
+  #gapSets = new Uint32Array(INITIAL_SLOTS * GAP_WORDS);
 
   get size(): number {
     return this.#records.size;
@@ -84,23 +89,30 @@ export class SeenIndex {
   #imageCandidates(fp: ImageFingerprint, t: Thresholds): RecordId[] {
     const maxDistance = DISTANCES.findLast((d) => similarityFromDistance(d) >= t.near) ?? -1;
     const queryGaps = Array.from({ length: CROP_COUNT }, (_, i) => hamming64(fp.crops, HASH_WORDS * i, fp.hash, 0));
-    const queryLow = Math.min(...queryGaps) - maxDistance;
-    const queryHigh = Math.max(...queryGaps) + maxDistance;
+    const isNear = (gap: number, direct: number): boolean => Math.abs(gap - direct) <= maxDistance;
+    const nearGaps = Uint8Array.from(DISTANCES.flatMap((direct) => DISTANCES.map((gap) => (isNear(gap, direct) ? 1 : 0))));
+    const queryCropsAt = DISTANCES.map((direct) => queryGaps.flatMap((gap, i) => (isNear(gap, direct) ? [i] : [])));
+    const windows = DISTANCES.map((direct) => gapSetOf(DISTANCES.filter((gap) => isNear(gap, direct))));
     const words = this.#imageWords;
     const gaps = this.#cropGaps;
+    const gapSets = this.#gapSets;
     const candidates: RecordId[] = [];
     for (let slot = 0; slot < this.#imageIds.length; slot++) {
       const base = slot * SLOT_WORDS;
-      const gapBase = slot * SLOT_GAPS;
       const direct = hamming64(fp.hash, 0, words, base);
-      const isCropReachable =
-        (direct >= queryLow && direct <= queryHigh) ||
-        (direct >= gaps[gapBase + GAP_MIN] - maxDistance && direct <= gaps[gapBase + GAP_MAX] + maxDistance);
+      const queryCrops = queryCropsAt[direct];
+      const window = windows[direct];
+      const setBase = slot * GAP_WORDS;
+      const isRecordCropReachable =
+        (gapSets[setBase] & window[0]) !== 0 || (gapSets[setBase + 1] & window[1]) !== 0 || (gapSets[setBase + 2] & window[2]) !== 0;
       let isClose = direct <= maxDistance;
-      for (let i = 0; i < CROP_COUNT && isCropReachable && !isClose; i++) {
-        isClose =
-          (Math.abs(queryGaps[i] - direct) <= maxDistance && hamming64(fp.crops, HASH_WORDS * i, words, base) <= maxDistance) ||
-          (Math.abs(gaps[gapBase + i] - direct) <= maxDistance && hamming64(fp.hash, 0, words, base + HASH_WORDS * (i + 1)) <= maxDistance);
+      for (let k = 0; k < queryCrops.length && !isClose; k++) {
+        isClose = hamming64(fp.crops, HASH_WORDS * queryCrops[k], words, base) <= maxDistance;
+      }
+      const gapBase = slot * CROP_COUNT;
+      const nearRow = direct * DISTANCES.length;
+      for (let i = 0; i < CROP_COUNT && isRecordCropReachable && !isClose; i++) {
+        isClose = nearGaps[nearRow + gaps[gapBase + i]] === 1 && hamming64(fp.hash, 0, words, base + HASH_WORDS * (i + 1)) <= maxDistance;
       }
       if (isClose) {
         candidates.push(this.#imageIds[slot]);
@@ -114,10 +126,13 @@ export class SeenIndex {
     if ((slot + 1) * SLOT_WORDS > this.#imageWords.length) {
       const grownWords = new Uint32Array(this.#imageWords.length * 2);
       const grownGaps = new Uint8Array(this.#cropGaps.length * 2);
+      const grownGapSets = new Uint32Array(this.#gapSets.length * 2);
       grownWords.set(this.#imageWords);
       grownGaps.set(this.#cropGaps);
+      grownGapSets.set(this.#gapSets);
       this.#imageWords = grownWords;
       this.#cropGaps = grownGaps;
+      this.#gapSets = grownGapSets;
     }
     this.#imageIds.push(id);
     this.#imageSlots.set(id, slot);
@@ -129,7 +144,8 @@ export class SeenIndex {
     this.#imageWords.set(fp.hash.subarray(0, HASH_WORDS), base);
     this.#imageWords.set(fp.crops.subarray(0, CROP_COUNT * HASH_WORDS), base + HASH_WORDS);
     const gaps = Array.from({ length: CROP_COUNT }, (_, i) => hamming64(fp.crops, HASH_WORDS * i, fp.hash, 0));
-    this.#cropGaps.set([...gaps, Math.min(...gaps), Math.max(...gaps)], slot * SLOT_GAPS);
+    this.#cropGaps.set(gaps, slot * CROP_COUNT);
+    this.#gapSets.set(gapSetOf(gaps), slot * GAP_WORDS);
   }
 
   #removeImageSlot(id: RecordId): void {
@@ -140,7 +156,8 @@ export class SeenIndex {
     const last = this.#imageIds.length - 1;
     const lastId = this.#imageIds[last];
     this.#imageWords.copyWithin(slot * SLOT_WORDS, last * SLOT_WORDS, (last + 1) * SLOT_WORDS);
-    this.#cropGaps.copyWithin(slot * SLOT_GAPS, last * SLOT_GAPS, (last + 1) * SLOT_GAPS);
+    this.#cropGaps.copyWithin(slot * CROP_COUNT, last * CROP_COUNT, (last + 1) * CROP_COUNT);
+    this.#gapSets.copyWithin(slot * GAP_WORDS, last * GAP_WORDS, (last + 1) * GAP_WORDS);
     this.#imageIds[slot] = lastId;
     this.#imageSlots.set(lastId, slot);
     this.#imageIds.pop();

@@ -43,6 +43,11 @@ export function imageFp(hash: Hash): ImageFingerprint {
   return { kind: 'image', hash: Uint32Array.of(...hash), crops, edges: new Uint32Array(EDGES) };
 }
 
+export function imageFpWithCropDeltas(hash: Hash, cropDeltas: Uint32Array): ImageFingerprint {
+  const crops = cropDeltas.map((delta, i) => (delta ^ hash[i % 2]) >>> 0);
+  return { kind: 'image', hash: Uint32Array.of(...hash), crops, edges: new Uint32Array(EDGES) };
+}
+
 export function sequenceFp(hashes: Hash[], durationS: number): FrameSequenceFingerprint {
   const frames = Uint32Array.from(hashes.flat());
   const timestamps = Float32Array.from(hashes, (_h, i) => ((i + 0.5) * durationS) / hashes.length);

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_THRESHOLDS, flip, imageFp, posterFp, randomHashes, sequenceFp } from '../../test/helpers/fingerprints.ts';
-import type { Fingerprint } from '../shared/types.ts';
+import type { Fingerprint, ImageFingerprint, MatchClass, Thresholds } from '../shared/types.ts';
+import { compareFingerprints } from '../similarity/compare.ts';
 import type { SeenRecord } from './seen-record.ts';
 
 const loadIndex = () => import('./seen-index.ts');
@@ -94,4 +95,52 @@ describe('seen index', () => {
     index.upsert('new', recordOf(imageFp(C), T0 + 1));
     expect(index.idsLastSeenBefore(T0)).toEqual(['old']);
   });
+});
+
+describe('seen index crop alignment pruning (AC-011, AC-078)', () => {
+  const RANK: Record<MatchClass, number> = { exact: 2, near: 1, different: 0 };
+  const words = randomHashes(4000, 77).flat();
+  const takeWords = (from: number, count: number) => Uint32Array.from(words.slice(from, from + count));
+  const withParts = (hash: Uint32Array, crops: Uint32Array): ImageFingerprint => ({ ...imageFp([hash[0], hash[1]]), hash, crops });
+  const queries = randomHashes(20, 909).map((h, q) => withParts(Uint32Array.of(...h), takeWords(q * 32, 32)));
+  const plantedRecordCrop = queries.map((q, i) => {
+    const crops = takeWords(1000 + i * 32, 32);
+    crops.set(Uint32Array.of(...flip([q.hash[0], q.hash[1]], 3)), 2 * (i % 16));
+    return withParts(takeWords(3000 + i * 2, 2), crops);
+  });
+  const plantedQueryCrop = queries.map((q, i) => {
+    const j = (i * 7) % 16;
+    return withParts(Uint32Array.of(...flip([q.crops[2 * j], q.crops[2 * j + 1]], 4)), takeWords(2000 + i * 32, 32));
+  });
+  const noise = randomHashes(500, 4321).map((h, i) => withParts(Uint32Array.of(...h), takeWords((i * 8) % 3900, 32)));
+
+  const bruteForce = (q: ImageFingerprint, fps: ImageFingerprint[], t: Thresholds) =>
+    fps
+      .map((fp) => compareFingerprints(q, fp, t))
+      .filter((c) => c.matchClass !== 'different')
+      .reduce<{ matchClass: MatchClass; similarity: number } | null>(
+        (best, c) =>
+          best === null || RANK[c.matchClass] > RANK[best.matchClass] || (c.matchClass === best.matchClass && c.similarity > best.similarity)
+            ? { matchClass: c.matchClass, similarity: c.similarity }
+            : best,
+        null,
+      );
+
+  it.each([DEFAULT_THRESHOLDS, { exact: 95, near: 80 }])(
+    'should find the same best match as a full scan if crops align in either direction (near %o)',
+    async (t) => {
+      const { SeenIndex } = await loadIndex();
+      const index = new SeenIndex();
+      const all = [...plantedRecordCrop, ...plantedQueryCrop, ...noise];
+      all.forEach((fp, i) => {
+        index.upsert(`r${i}`, recordOf(fp));
+      });
+      const found = queries.map((q) => {
+        const match = index.findBest(q, t);
+        return match && { matchClass: match.comparison.matchClass, similarity: match.comparison.similarity };
+      });
+      expect(found).toEqual(queries.map((q) => bruteForce(q, all, t)));
+      expect(found.every((m) => m !== null)).toBe(true);
+    },
+  );
 });
