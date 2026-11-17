@@ -4,7 +4,8 @@ import type { SeenService } from '../engine/seen-service.ts';
 import type { WhitelistStore } from '../engine/whitelist-store.ts';
 import type { SeenRepository } from '../repository/seen-repository.ts';
 import type { Request, RequestType, ResponseOf } from '../shared/messages.ts';
-import { decodeFingerprint, decodeSighting } from '../shared/wire.ts';
+import { decodeFingerprint, decodeGrayFrame, decodeSighting, encodeDecodeResult } from '../shared/wire.ts';
+import type { MediaService } from './media-service.ts';
 
 export type RouterDeps = {
   seen: SeenService;
@@ -12,6 +13,7 @@ export type RouterDeps = {
   whitelist: Pick<WhitelistStore, 'add' | 'remove'>;
   repository: Pick<SeenRepository, 'ready' | 'persisted' | 'clear'>;
   log: (m: string) => void;
+  media?: MediaService;
 };
 
 export type Router = (req: Request, sender: RequestSender) => Promise<unknown>;
@@ -22,10 +24,12 @@ const OK = { ok: true } as const;
 
 const notAvailable = (type: RequestType) => (): Promise<never> => Promise.reject(new Error(`PureFeed: ${type} is not available`));
 
-export function createRouter({ seen, counters, whitelist, repository, log }: RouterDeps): Router {
+export function createRouter({ seen, counters, whitelist, repository, log, media }: RouterDeps): Router {
   const handlers: Handlers = {
-    'media/fingerprint': notAvailable('media/fingerprint'),
-    'media/frames': notAvailable('media/frames'),
+    'media/fingerprint': media ? async (req) => encodeDecodeResult(await media.fingerprint(req.req)) : notAvailable('media/fingerprint'),
+    'media/frames': media
+      ? async (req) => encodeDecodeResult(await media.frames(req.frames.map(decodeGrayFrame), req.durationS, req.posterUrl))
+      : notAvailable('media/frames'),
     'seen/lookup': async (req) => ({ matches: await seen.lookup(req.fingerprints.map(decodeFingerprint)) }),
     'seen/record': (req) => seen.record(decodeSighting(req.sighting)),
     'stats/hidden': async () => {

@@ -15,9 +15,19 @@ const host = globalThis as typeof globalThis & { browser?: Api; chrome?: Api };
 const api = host.browser ?? host.chrome;
 
 export const ext: Ext = {
-  runtime: api.runtime,
-  storage: { local: api.storage.local, onChanged: api.storage.onChanged },
-  permissions: api.permissions,
-  alarms: api.alarms,
-  offscreen: TARGET === 'chrome' ? api.offscreen : undefined,
+  get runtime() {
+    return api.runtime;
+  },
+  get storage() {
+    return { local: api.storage.local, onChanged: api.storage.onChanged };
+  },
+  get permissions() {
+    return api.permissions;
+  },
+  get alarms() {
+    return api.alarms;
+  },
+  get offscreen() {
+    return TARGET === 'chrome' ? api.offscreen : undefined;
+  },
 };

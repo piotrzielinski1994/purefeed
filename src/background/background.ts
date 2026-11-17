@@ -1,5 +1,6 @@
 import { ext } from '../compat/browser.ts';
 import { onRequest } from '../compat/messaging.ts';
+import type { DecoderHost } from '../decoder/decoder-host.ts';
 import { createCounters } from '../engine/counters.ts';
 import { startRetention } from '../engine/retention.ts';
 import { createSeenService } from '../engine/seen-service.ts';
@@ -8,9 +9,10 @@ import { openIdbSeenStore } from '../repository/idb-seen-store.ts';
 import { createSeenRepository } from '../repository/seen-repository.ts';
 import { createSettingsSource } from '../shared/settings.ts';
 import type { SetTimer } from '../shared/types.ts';
+import { createMediaService } from './media-service.ts';
 import { createRouter } from './router.ts';
 
-export function startBackground(): void {
+export function startBackground(decoder: DecoderHost): void {
   const setTimer: SetTimer = (fn, ms) => setTimeout(fn, ms);
   const storage = ext.storage.local;
   const settings = createSettingsSource({ storage, onChanged: ext.storage.onChanged });
@@ -23,7 +25,8 @@ export function startBackground(): void {
     newId: () => crypto.randomUUID(),
   });
   const seen = createSeenService({ repository, settings, counters });
-  const router = createRouter({ seen, counters, whitelist, repository, log: (m) => console.warn(m) });
+  const media = createMediaService(decoder);
+  const router = createRouter({ seen, counters, whitelist, repository, media, log: (m) => console.warn(m) });
   const ready = Promise.all([settings.ready, counters.ready, whitelist.ready]);
   onRequest(async (req, sender) => {
     await ready;
