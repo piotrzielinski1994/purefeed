@@ -2,7 +2,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createFakeBackground, okImage, type SeedRecord } from '../../test/helpers/fake-background.ts';
 import { createFakeClock, settle } from '../../test/helpers/fake-ext.ts';
-import { createFakeObservers } from '../../test/helpers/fake-observers.ts';
+import { createFakeObservers, setLayout } from '../../test/helpers/fake-observers.ts';
 import { DAY_MS, imageFp, randomHashes } from '../../test/helpers/fingerprints.ts';
 import { fragment, loadFixture, mediaEls, setUrl } from '../../test/helpers/fixtures.ts';
 import type { PlatformAdapter } from './adapter.ts';
@@ -127,5 +127,44 @@ describe('content runtime generic fallback switch (AC-048, TC-067)', () => {
     await clock.advance(15_000);
     expect(bg.fingerprintUrls().length).toBeGreaterThan(0);
     expect(bg.of('log/warn')).toHaveLength(0);
+  });
+});
+
+describe('content runtime generic fallback boundaries (AC-048)', () => {
+  const primaryImages = () => [...document.querySelectorAll('img[data-post-media-primary]')];
+
+  it('should switch to the fallback exactly 10 s after start and not 1 ms earlier', async () => {
+    loadFixture(document, 'generic/renamed-reddit.html');
+    const { clock, bg } = await startRuntime(await loadReddit());
+    await clock.advance(9_999);
+    expect(bg.of('log/warn')).toHaveLength(0);
+    expect(bg.fingerprintUrls()).toEqual([]);
+    await clock.advance(1);
+    expect(bg.of('log/warn')).toHaveLength(1);
+    expect(articles().map(isHidden)).toEqual([false, true, false]);
+  });
+
+  for (const [width, height] of [
+    [149, 540],
+    [545, 149],
+    [149, 149],
+  ]) {
+    it(`should not switch to the fallback if the third media item renders at ${width} x ${height} CSS px`, async () => {
+      loadFixture(document, 'generic/renamed-reddit.html');
+      setLayout(primaryImages()[2], { top: 1200, width, height });
+      const { clock, bg } = await startRuntime(await loadReddit());
+      await clock.advance(30_000);
+      expect(bg.of('log/warn')).toHaveLength(0);
+      expect(bg.fingerprintUrls()).toEqual([]);
+    });
+  }
+
+  it('should switch to the fallback if the third media item renders at exactly 150 x 150 CSS px', async () => {
+    loadFixture(document, 'generic/renamed-reddit.html');
+    setLayout(primaryImages()[2], { top: 1200, width: 150, height: 150 });
+    const { clock, bg } = await startRuntime(await loadReddit());
+    await clock.advance(10_000);
+    expect(bg.of('log/warn')).toHaveLength(1);
+    expect(bg.fingerprintUrls()).toEqual([R1, R2, R3]);
   });
 });
