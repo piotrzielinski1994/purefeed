@@ -64,8 +64,7 @@ const LIMITS: Record<string, RegExp[]> = {
   'no link previews or link thumbnails (1.1)': [/link/i, /preview|thumbnail|card/i],
   'no text-only posts or text deduplication (1.1)': [/text/i, /text-only|text only|text deduplication/i],
   'no store publication (1.1)': [/Chrome Web Store|\bAMO\b|addons\.mozilla\.org/],
-  'caption change only inside an image corner is not detected (Decision Log)': [/corner/i, /caption|text/i],
-  'logo or watermark in the image centre counts as different (Decision Log)': [/cent(re|er)/i, /logo|watermark/i, /different|not match/i],
+  'repost with an added logo or watermark counts as new content (Decision Log)': [/logo|watermark/i, /new content/i],
   'video poster-only until the page plays it, and for tainted videos (Decision Log)': [
     /poster/i,
     /play/i,

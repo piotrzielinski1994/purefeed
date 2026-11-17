@@ -101,8 +101,7 @@ A hidden post stays in the page; a bar takes its place:
 - Comments and replies are not processed (Reddit comments, Wykop entry comments, X replies on a status page).
 - Link previews are not fingerprinted (Wykop link thumbnails, X link cards, Reddit link thumbnails).
 - Text-only posts are ignored; there is no text deduplication.
-- A caption change only inside an image corner (outer 25% on both axes) is not detected: the caption guard skips the 4 corner zones, where logos and watermarks usually sit.
-- A logo or watermark added in the image centre is checked like a caption change, so such a copy can count as different.
+- A repost with an added logo or watermark counts as new content: the caption guard checks the whole image, corners included, so such a copy is not hidden.
 - Third-party embeds (for example YouTube iframes on Wykop and Reddit) are not fingerprinted.
 - Animated WebP and AVIF images use the first frame only, as an image.
 - Retention purge runs at each background start and on a 24 h alarm; each background restart creates the alarm again, so its 24 h period starts over.
@@ -155,7 +154,7 @@ A hidden post stays in the page; a bar takes its place:
 | AC-008 | Image formats fingerprinted from pixels              | `src/decoder/media-decoder.test.ts`, `test/e2e/media-pipeline.spec.ts`                                   |
 | AC-009 | Small and flat images ignored                        | `src/adapters/dom-utils.test.ts`, `src/fingerprint/image-fingerprint.test.ts`                            |
 | AC-010 | Resize, recompression, conversion                    | `src/fingerprint/image-fingerprint.test.ts`, `src/similarity/image-similarity.test.ts`                   |
-| AC-011 | Crop and corner logo                                 | `src/fingerprint/crops.test.ts`, `src/similarity/image-similarity.test.ts`                               |
+| AC-011 | Crop; added logo or watermark is `different`         | `src/similarity/image-similarity.test.ts`, `test/similarity/false-positives.test.ts`                     |
 | AC-012 | Cross-origin image without taint                     | `src/decoder/media-decoder.test.ts`, `test/e2e/media-pipeline.spec.ts`                                   |
 | AC-013 | One fetch per URL per page session                   | `src/background/media-service.test.ts`, `test/e2e/media-pipeline.spec.ts`                                |
 | AC-014 | `gif` and `video` content types                      | `src/adapters/reddit.test.ts`, `src/adapters/x.test.ts`, `src/decoder/hash-jobs.test.ts`                 |

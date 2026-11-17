@@ -73,10 +73,11 @@ describe('caption guard (AC-027, AC-028)', () => {
     expect(guardRejects(cropped.edges, base.edges, bestImageSimilarity(cropped, base).alignment)).toBe(false);
   });
 
-  it('should not reject if base.png is compared with its copy with a logo on 5% of the area', ASSET_TEST, async () => {
+  it('should reject if base.png is compared with its copy with a logo on 5% of the area', ASSET_TEST, async () => {
     const { guardRejects } = await loadGuard();
     const base = await fingerprintAsset('base.png');
     const logo = await fingerprintAsset('logo5.png');
-    expect(guardRejects(base.edges, logo.edges, NONE)).toBe(false);
+    expect(guardRejects(base.edges, logo.edges, NONE)).toBe(true);
+    expect(guardRejects(logo.edges, base.edges, NONE)).toBe(true);
   });
 });

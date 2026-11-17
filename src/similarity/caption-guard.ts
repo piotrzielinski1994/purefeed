@@ -6,7 +6,6 @@ type EdgeGrid = readonly boolean[];
 
 const BLOCK = 4;
 const BLOCKS_PER_SIDE = EDGE_GRID / BLOCK;
-const CORNER_BLOCKS = BLOCKS_PER_SIDE / 4;
 const GUARD_BLOCK_RATIO = 0.15;
 const GUARD_MIN_BLOCKS = 2;
 const FULL_FRAME: CropRect = { left: 0, right: 0, top: 0, bottom: 0 };
@@ -38,9 +37,6 @@ const dilate = (grid: EdgeGrid): EdgeGrid =>
     );
   });
 
-const isCornerBlock = (bx: number, by: number): boolean =>
-  (bx < CORNER_BLOCKS || bx >= BLOCKS_PER_SIDE - CORNER_BLOCKS) && (by < CORNER_BLOCKS || by >= BLOCKS_PER_SIDE - CORNER_BLOCKS);
-
 export function guardRejects(a: Uint32Array, b: Uint32Array, alignment: Alignment): boolean {
   const gridA = sampleGrid(a, alignment.side === 'a-cropped' ? alignment.crop : FULL_FRAME);
   const gridB = sampleGrid(b, alignment.side === 'b-cropped' ? alignment.crop : FULL_FRAME);
@@ -52,9 +48,6 @@ export function guardRejects(a: Uint32Array, b: Uint32Array, alignment: Alignmen
   const mismatchedBlocks = Array.from({ length: BLOCKS_PER_SIDE * BLOCKS_PER_SIDE }).filter((_v, k) => {
     const bx = k % BLOCKS_PER_SIDE;
     const by = Math.floor(k / BLOCKS_PER_SIDE);
-    if (isCornerBlock(bx, by)) {
-      return false;
-    }
     const unmatched = Array.from({ length: blockSize }).filter((_c, c) =>
       isUnmatched((by * BLOCK + Math.floor(c / BLOCK)) * EDGE_GRID + bx * BLOCK + (c % BLOCK)),
     ).length;

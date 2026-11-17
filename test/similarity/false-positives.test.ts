@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { ImageFingerprint, Thresholds } from '../../src/shared/types.ts';
+import type { GrayImage, Thresholds } from '../../src/shared/types.ts';
 import { loadGray } from '../helpers/assets.ts';
 
 const loadCompare = () => import('../../src/similarity/compare.ts');
@@ -7,18 +7,32 @@ const loadFingerprint = () => import('../../src/fingerprint/image-fingerprint.ts
 const ASSET_TEST = { timeout: 120_000 };
 const DEFAULTS: Thresholds = { exact: 95, near: 90 };
 
-async function fingerprintAsset(name: string): Promise<ImageFingerprint> {
+async function classifyImages(a: GrayImage, b: GrayImage): Promise<[string, string]> {
+  const { compareFingerprints } = await loadCompare();
   const { fingerprintImage } = await loadFingerprint();
-  const fp = fingerprintImage(loadGray(name));
-  if (!fp) throw new Error(`${name}: no fingerprint`);
-  return fp;
+  const [fa, fb] = [fingerprintImage(a), fingerprintImage(b)];
+  if (!fa || !fb) throw new Error('no fingerprint');
+  return [compareFingerprints(fa, fb, DEFAULTS).matchClass, compareFingerprints(fb, fa, DEFAULTS).matchClass];
 }
 
-async function classify(a: string, b: string): Promise<[string, string]> {
-  const { compareFingerprints } = await loadCompare();
-  const fa = await fingerprintAsset(a);
-  const fb = await fingerprintAsset(b);
-  return [compareFingerprints(fa, fb, DEFAULTS).matchClass, compareFingerprints(fb, fa, DEFAULTS).matchClass];
+const classify = (a: string, b: string): Promise<[string, string]> => classifyImages(loadGray(a), loadGray(b));
+
+type Block = { x: number; y: number; width: number; height: number };
+
+const LOGO_SIDE = 134;
+const TEXT_BLOCK = { width: 100, height: 60 };
+const BLOCK_WHITE = 250;
+
+const textPattern = (x: number, y: number): number => (((x >> 2) + (y >> 2)) % 2 === 1 ? 255 : 0);
+
+function withBlock(image: GrayImage, block: Block, paint: (x: number, y: number) => number): GrayImage {
+  const isInside = (x: number, y: number): boolean => x >= block.x && x < block.x + block.width && y >= block.y && y < block.y + block.height;
+  const data = image.data.map((value, i) => {
+    const x = i % image.width;
+    const y = Math.floor(i / image.width);
+    return isInside(x, y) ? paint(x, y) : value;
+  });
+  return { ...image, data };
 }
 
 describe('false-positive guard on generated assets (AC-027, AC-028)', () => {
@@ -39,6 +53,40 @@ describe('false-positive guard on generated assets (AC-027, AC-028)', () => {
   });
 });
 
+describe('added overlays count as different content (AC-011, AC-027)', () => {
+  it('should return different if a text block on 1.7% of the area is added in any corner of caption-a.png', ASSET_TEST, async () => {
+    const original = loadGray('caption-a.png');
+    const far = { x: original.width - TEXT_BLOCK.width - 20, y: original.height - TEXT_BLOCK.height - 20 };
+    const corners: Block[] = [
+      { x: 20, y: 20, ...TEXT_BLOCK },
+      { x: far.x, y: 20, ...TEXT_BLOCK },
+      { x: 20, y: far.y, ...TEXT_BLOCK },
+      { x: far.x, y: far.y, ...TEXT_BLOCK },
+    ];
+    const results = await Promise.all(corners.map((block) => classifyImages(original, withBlock(original, block, textPattern))));
+    expect(results).toEqual(corners.map(() => ['different', 'different']));
+  });
+
+  it('should return different if base.png gets a 5% block in a corner, the centre, the right or the bottom', ASSET_TEST, async () => {
+    const original = loadGray('base.png');
+    const logo = { width: LOGO_SIDE, height: LOGO_SIDE };
+    const blocks: Record<string, Block> = {
+      'top-left corner': { x: 10, y: 10, ...logo },
+      'top-right corner': { x: 456, y: 10, ...logo },
+      'bottom-left corner': { x: 10, y: 456, ...logo },
+      centre: { x: 233, y: 233, ...logo },
+      'right middle': { x: 456, y: 233, ...logo },
+      'bottom-centre band 400x45': { x: 100, y: 540, width: 400, height: 45 },
+    };
+    const entries = Object.entries(blocks);
+    const white = (block: Block): GrayImage => withBlock(original, block, () => BLOCK_WHITE);
+    const results = await Promise.all(entries.map(([, block]) => classifyImages(original, white(block))));
+    expect(Object.fromEntries(entries.map(([name], i) => [name, results[i]]))).toEqual(
+      Object.fromEntries(entries.map(([name]) => [name, ['different', 'different']])),
+    );
+  });
+});
+
 describe('match class regression on generated assets (AC-010, AC-011, AC-023)', () => {
   it('should return exact if base.png is compared with its resized, recompressed and converted copies', ASSET_TEST, async () => {
     const copies = ['base-25.png', 'base-50.png', 'base-200.png', 'base-400.png', 'base-q30.jpg', 'base-q60.jpg', 'base-q95.jpg'];
@@ -47,10 +95,9 @@ describe('match class regression on generated assets (AC-010, AC-011, AC-023)', 
     }
   });
 
-  it('should return exact or near if base.png is compared with its cropped copy or its copy with a logo', ASSET_TEST, async () => {
-    for (const name of ['crop-l10-tb5.png', 'logo5.png']) {
-      for (const matchClass of await classify('base.png', name)) expect(['exact', 'near'], name).toContain(matchClass);
-    }
+  it('should return exact for the cropped copy of base.png and different for its copy with a logo', ASSET_TEST, async () => {
+    expect(await classify('base.png', 'crop-l10-tb5.png')).toEqual(['exact', 'exact']);
+    expect(await classify('base.png', 'logo5.png')).toEqual(['different', 'different']);
   });
 
   it('should return different if unrelated control images are compared with base.png or with each other', ASSET_TEST, async () => {
