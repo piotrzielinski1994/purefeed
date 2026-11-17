@@ -5,6 +5,7 @@ import { attachUi, INDICATOR_CSS } from './styles.ts';
 export const PLATFORM_LABEL: Record<Platform, string> = { reddit: 'Reddit', wykop: 'Wykop', x: 'X' };
 
 const MATCH_LABEL = { exact: 'exact', near: 'similar' } as const;
+const ALWAYS_SHOW = 'Always show';
 
 export type IndicatorData = {
   matchClass: 'exact' | 'near';
@@ -25,9 +26,11 @@ export function createIndicator(doc: Document, data: IndicatorData, actions: Ind
     el.textContent = text;
     return el;
   };
-  const button = (label: string, onClick: () => void): HTMLButtonElement => {
-    const el = element('button', 'action', label);
+  const button = (className: string, prefix: string, label: string, onClick: () => void): HTMLButtonElement => {
+    const el = element('button', className);
     el.type = 'button';
+    el.setAttribute('aria-label', prefix === '' ? label : `${prefix} ${label}`);
+    el.append(...(prefix === '' ? [label] : [element('span', 'prefix', prefix), ` ${label}`]));
     el.addEventListener('click', onClick);
     return el;
   };
@@ -40,9 +43,9 @@ export function createIndicator(doc: Document, data: IndicatorData, actions: Ind
   text.append(`Hidden by PureFeed: ${MATCH_LABEL[data.matchClass]}, `, link, ` ${formatRelative(data.firstSeenAt, data.nowMs)}`);
 
   const actionsRow = element('div', 'actions');
-  actionsRow.append(button('Show', actions.onShow), button('Always show this post', actions.onAlwaysShowPost));
+  actionsRow.append(button('action', '', 'Show', actions.onShow), button('action', ALWAYS_SHOW, 'this post', actions.onAlwaysShowPost));
   if (data.authorLabel !== null) {
-    actionsRow.append(button(`Always show ${data.authorLabel}`, actions.onAlwaysShowAuthor));
+    actionsRow.append(button('action author', ALWAYS_SHOW, data.authorLabel, actions.onAlwaysShowAuthor));
   }
   const bar = element('div', 'bar');
   bar.append(text, actionsRow);

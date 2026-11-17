@@ -18,6 +18,9 @@ a:focus-visible {
 `;
 
 export const INDICATOR_CSS = `${BASE_CSS}
+:host {
+  container-type: inline-size !important;
+}
 .bar {
   box-sizing: border-box;
   max-height: 56px;
@@ -45,12 +48,24 @@ a {
 }
 button {
   display: inline-block;
+  flex: none;
   margin: 0;
   padding: 0 6px;
   border: 1px solid #b8bec5;
   border-radius: 4px;
   background: #ffffff;
   cursor: pointer;
+}
+.author {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+@container (max-width: 480px) {
+  .prefix {
+    display: none;
+  }
 }
 `;
 

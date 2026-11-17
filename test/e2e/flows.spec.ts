@@ -496,6 +496,64 @@ test.describe('cross-platform flows on local Wykop, Reddit and X feeds (AC-029, 
   });
 });
 
+type Box = { left: number; top: number; right: number; bottom: number };
+type IndicatorLayout = { bar: Box; textLines: number; buttons: Array<{ name: string; box: Box }> };
+
+async function indicatorLayout(page: Page, barBackendNodeId: number): Promise<IndicatorLayout> {
+  const cdp = await page.context().newCDPSession(page);
+  try {
+    const { object } = (await cdp.send('DOM.resolveNode', { backendNodeId: barBackendNodeId })) as { object: { objectId: string } };
+    const { result } = (await cdp.send('Runtime.callFunctionOn', {
+      objectId: object.objectId,
+      returnByValue: true,
+      functionDeclaration: `function () {
+        const box = (el) => { const r = el.getBoundingClientRect(); return { left: r.left, top: r.top, right: r.right, bottom: r.bottom }; };
+        const text = this.querySelector('.text');
+        const lineHeight = parseFloat(getComputedStyle(text).lineHeight);
+        return {
+          bar: box(this),
+          textLines: Math.round(text.getBoundingClientRect().height / lineHeight),
+          buttons: [...this.querySelectorAll('button')].map((b) => ({ name: b.getAttribute('aria-label') ?? b.textContent, box: box(b) })),
+        };
+      }`,
+    })) as { result: { value: IndicatorLayout } };
+    return result.value;
+  } finally {
+    await cdp.detach();
+  }
+}
+
+const isInside = (inner: Box, outer: Box): boolean =>
+  inner.left >= outer.left && inner.right <= outer.right && inner.top >= outer.top && inner.bottom <= outer.bottom && inner.right > inner.left;
+
+test.describe('hide indicator layout (AC-051, TC-070)', () => {
+  for (const width of [null, 384, 320]) {
+    test(`should keep the indicator within 56 px and 2 text lines with every button inside the bar at ${width ?? 'default'} px`, async ({
+      context,
+    }) => {
+      const page = await openFeed(
+        context,
+        'reddit',
+        `tc070-${width ?? 'default'}`,
+        [
+          imgPost('reddit', 'o', `pf70${width ?? 0}a`, 'base.png'),
+          imgPost('reddit', 'd', `pf70${width ?? 0}b`, 'base-50.png', 'pf_tc070_author'),
+        ],
+        { css: width === null ? '' : `body { width: ${width}px; }` },
+      );
+      await expect.poll(() => isHidden(page, 'd'), { timeout: 30_000 }).toBe(true);
+      const indicator = await indicatorOf(page, 'd');
+      if (!indicator?.contentBackendNodeId) throw new Error('no indicator');
+      const layout = await indicatorLayout(page, indicator.contentBackendNodeId);
+      expect(layout.bar.bottom - layout.bar.top).toBeLessThanOrEqual(56);
+      expect(layout.textLines).toBeLessThanOrEqual(2);
+      expect(layout.buttons.map((b) => b.name)).toEqual(['Show', 'Always show this post', 'Always show u/pf_tc070_author']);
+      expect(layout.buttons.filter((b) => !isInside(b.box, layout.bar)).map((b) => b.name)).toEqual([]);
+      expect(new Set(layout.buttons.map((b) => Math.round(b.box.top))).size).toBe(1);
+    });
+  }
+});
+
 test.describe('popup toggles in open tabs (AC-063, AC-065, TC-083, TC-085)', () => {
   const MASTER = /purefeed|deduplication|enable/i;
 

@@ -60,6 +60,7 @@ A hidden post stays in the page; a bar takes its place:
 - "Show": shows the post for the rest of the page session.
 - "Always show this post": adds the post to the whitelist.
 - "Always show <author>": adds the author (`u/<name>` on Reddit, `@<name>` on Wykop and X) to the whitelist.
+- In a feed column narrower than 480 px the bar drops "Always show" from the button labels ("this post", "<author>") and shortens a long author name with an ellipsis; the accessible names stay complete.
 - A toast "PureFeed hid N duplicate(s)" shows in the bottom-right corner when posts are hidden (toast toggle in the options).
 
 ### Whitelist
