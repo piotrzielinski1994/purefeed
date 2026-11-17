@@ -1,0 +1,13 @@
+import { defineConfig } from '@playwright/test';
+
+export default defineConfig({
+  testDir: 'test/e2e',
+  testMatch: '**/*.spec.ts',
+  workers: 1,
+  fullyParallel: false,
+  timeout: 90_000,
+  expect: { timeout: 10_000 },
+  reporter: [['list']],
+  outputDir: 'test-results',
+  projects: [{ name: 'chromium' }],
+});
